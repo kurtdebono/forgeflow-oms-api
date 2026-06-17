@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
+
+
 
 @Injectable()
 export class InventoryRepository {
     constructor(private readonly prisma: PrismaService) {
-    
+        type PrismaClientOrTransaction = | Prisma.TransactionClient | typeof this.prisma;
     }
 
     create(data: CreateInventoryDto) {
@@ -21,8 +24,12 @@ export class InventoryRepository {
         });
     }
 
-    reserveStock(productId: string, quantity: number) {
-        return this.prisma.inventory.updateMany({
+    reserveStock(
+        productId: string, 
+        quantity: number,
+        tx: Prisma.TransactionClient = this.prisma
+    ) {
+        return tx.inventory.updateMany({
             where: {
                 productId,
                 availableQuantity: {

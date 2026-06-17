@@ -8,8 +8,11 @@ export class OrdersRepository {
 
     }
 
-    create(data: Prisma.OrderCreateInput) {
-        return this.prisma.order.create({
+    create(
+        data: Prisma.OrderCreateInput,
+        tx: Prisma.TransactionClient = this.prisma
+    ) {
+        return tx.order.create({
             data,
             include: {
                 user: true,

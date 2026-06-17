@@ -7,6 +7,7 @@ import { ProductService } from '../products/product.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
 import { ReserveStockDto } from './dto/reserve-stock.dto';
 import { InventoryRepository } from './inventory.repository';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class InventoryService {
@@ -33,10 +34,14 @@ export class InventoryService {
         return inventory;
     }
 
-    async reserveStock(data: ReserveStockDto) {
+    async reserveStock(
+        data: ReserveStockDto,
+        tx?: Prisma.TransactionClient
+    ) {
         const result = await this.inventoryRepository.reserveStock(
             data.productId,
-            data.quantity
+            data.quantity,
+            tx
         );
 
         if (result.count === 0) {
