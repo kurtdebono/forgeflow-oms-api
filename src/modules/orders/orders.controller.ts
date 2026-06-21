@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrdersService } from './orders.service';
+import { JwtAuthGuard } from '../auth/strategies/jwt-auth.guard';
+
 
 @Controller('orders')
 export class OrdersController {
@@ -13,6 +15,7 @@ export class OrdersController {
         return this.ordersService.create(body);
     }
 
+    @UseGuards(JwtAuthGuard)
     @Get(':id')
     findById(@Param('id') id: string) {
         return this.ordersService.findById(id);
