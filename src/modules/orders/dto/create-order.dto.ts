@@ -20,10 +20,6 @@ class CreateOrderItemDto {
 }
 
 export class CreateOrderDto {
-    @IsUUID()
-    @IsNotEmpty()
-    userId: string;
-
     @IsArray()
     @ArrayMinSize(1)
     @ValidateNested({ each: true })

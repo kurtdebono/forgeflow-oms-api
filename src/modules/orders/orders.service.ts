@@ -17,7 +17,7 @@ export class OrdersService {
         private readonly prismaService: PrismaService
     ) {}
 
-    async create(data: CreateOrderDto) {
+    async create(userId: string, data: CreateOrderDto) {
         return this.prismaService.$transaction(async (tx) => {
             const orderItems: Prisma.OrderItemCreateWithoutOrderInput[] = [];
 
@@ -47,7 +47,7 @@ export class OrdersService {
             const orderCreateInput: Prisma.OrderCreateInput = {
                 user: {
                     connect: {
-                        id: data.userId
+                        id: userId
                     }
                 },
                 totalAmount,
