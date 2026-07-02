@@ -99,6 +99,14 @@ export class AuthService {
         return tokens;
     }
 
+    async logout(userId: string) {
+        await this.usersService.updateRefreshTokenHash(userId, null);
+
+        return {
+            message: 'Logged out successfully.'
+        };
+    }
+
     private async generateTokens(user: {
         id: string;
         email: string;
