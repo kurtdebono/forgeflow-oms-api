@@ -25,4 +25,8 @@ export class UsersService {
     findByEmail(email: string) {
         return this.usersRepository.findByEmail(email);
     }
+
+    updateRefreshTokenHash(userId: string, refreshTokenHash: string | null) {
+        return this.usersRepository.updateRefreshTokenHash(userId, refreshTokenHash);
+    }
 }
