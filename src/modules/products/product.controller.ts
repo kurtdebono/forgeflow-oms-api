@@ -22,9 +22,9 @@ export class ProductController {
         return this.productService.findById(id);
     }
 
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.ADMIN)
     @Post()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.ADMIN)    
     create(@Body() body: CreateProductDto) {
         return this.productService.create(body);
     }
