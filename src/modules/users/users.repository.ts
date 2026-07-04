@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
+import { publicUserSelect } from './selects/user.select';
 
 @Injectable()
 export class UsersRepository {
@@ -9,7 +10,10 @@ export class UsersRepository {
     }
 
     create(data: Prisma.UserCreateInput) {
-        return this.prisma.user.create({ data });
+        return this.prisma.user.create({ 
+            data,
+            select: publicUserSelect
+        });
     }
 
     findById(id: string) {

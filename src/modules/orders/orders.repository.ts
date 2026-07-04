@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 import { OrderStatus } from '@prisma/client';
+import { publicUserSelect } from '../users/selects/user.select';
 
 @Injectable()
 export class OrdersRepository {
@@ -16,7 +17,9 @@ export class OrdersRepository {
         return tx.order.create({
             data,
             include: {
-                user: true,
+                user: {
+                    select: publicUserSelect
+                },
                 items: {
                     include: {
                         product: true
@@ -33,7 +36,9 @@ export class OrdersRepository {
         return tx.order.findUnique({
             where: { id },
             include: {
-                user: true,
+                user: {
+                    select: publicUserSelect
+                },
                 items: {
                     include: {
                         product: true
