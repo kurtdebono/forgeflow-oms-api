@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateProductDto } from './dto/create-product.dto';
 import { ProductRepository } from './product.repository';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ProductService {
@@ -12,8 +13,8 @@ export class ProductService {
         return this.productRepository.get();
     }
 
-    async findById(id: string) {
-        const product = await this.productRepository.findById(id);
+    async findById(id: string, tx?: Prisma.TransactionClient) {
+        const product = await this.productRepository.findById(id, tx);
 
         if (!product) {
             throw new NotFoundException(`Product with id ${id} not found`);

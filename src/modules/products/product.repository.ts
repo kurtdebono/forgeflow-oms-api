@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { CreateProductDto } from './dto/create-product.dto';
 
 @Injectable()
@@ -16,15 +17,15 @@ export class ProductRepository {
         });
     }
 
-    findById(id: string) {
-        return this.prisma.product.findUnique({
+    findById(id: string, tx: Prisma.TransactionClient = this.prisma) {
+        return tx.product.findUnique({
             where: {
                 id
             }
         });
     }
 
-    create(data: CreateProductDto) {
+    create(data: Prisma.ProductCreateInput) {
         return this.prisma.product.create({
             data
         });

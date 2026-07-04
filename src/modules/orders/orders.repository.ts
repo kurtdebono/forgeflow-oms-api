@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
+import { OrderStatus } from '@prisma/client';
 
 @Injectable()
 export class OrdersRepository {
@@ -25,8 +26,11 @@ export class OrdersRepository {
         });
     }
 
-    findById(id: string) {
-        return this.prisma.order.findUnique({
+    findById(
+        id: string,
+        tx: Prisma.TransactionClient = this.prisma
+    ) {
+        return tx.order.findUnique({
             where: { id },
             include: {
                 user: true,
@@ -51,6 +55,23 @@ export class OrdersRepository {
                         product: true
                     }
                 }
+            }
+        });
+    }
+
+    tryUpdateStatus(
+        id: string,
+        currentStatus: OrderStatus,
+        nextStatus: OrderStatus,
+        tx: Prisma.TransactionClient = this.prisma
+    ) {
+        return tx.order.updateMany({
+            where: {
+                id,
+                status: currentStatus
+            },
+            data: {
+                status: nextStatus
             }
         });
     }

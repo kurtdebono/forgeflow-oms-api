@@ -46,4 +46,47 @@ export class InventoryRepository {
             }
         });
     }
+
+    consumeReservedStock(
+        productId: string,
+        quantity: number,
+        tx: Prisma.TransactionClient = this.prisma
+    ) {
+        return tx.inventory.updateMany({
+            where: {
+                productId,
+                reservedQuantity: {
+                    gte: quantity
+                }
+            },
+            data: {
+                reservedQuantity: {
+                    decrement: quantity
+                }
+            }
+        })
+    }
+
+    releaseReservedStock(
+        productId: string,
+        quantity: number,
+        tx: Prisma.TransactionClient = this.prisma
+    ) {
+        return tx.inventory.updateMany({
+            where: {
+                productId,
+                reservedQuantity: {
+                    gte: quantity
+                }
+            },
+            data: {
+                reservedQuantity: {
+                    decrement: quantity
+                },
+                availableQuantity: {
+                    increment: quantity
+                }
+            }
+        })
+    }
 }

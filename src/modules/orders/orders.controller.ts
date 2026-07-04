@@ -27,8 +27,25 @@ export class OrdersController {
     findMyOrders(@CurrentUser() user: CurrentUser) {
         return this.ordersService.findByUserId(user.userId);
     }
-    
+
+    @Post(':id/confirm')
     @Roles(UserRole.ADMIN)
+    confirm(@Param('id') id: string) {
+        return this.ordersService.confirm(id);
+    }
+
+    @Post(':id/cancel')
+    @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+    cancel(
+        @Param('id') id: string,
+        @CurrentUser() user: CurrentUser
+    ) {
+        return this.ordersService.cancel(id, { 
+            userId: user.userId, 
+            role: user.role as UserRole
+        });
+    }
+
     @Get(':id')
     findById(@Param('id') id: string) {
         return this.ordersService.findById(id);

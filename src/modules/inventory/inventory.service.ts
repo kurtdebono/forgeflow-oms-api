@@ -50,4 +50,44 @@ export class InventoryService {
 
         return this.findByProductId(data.productId);
     }
+
+    async consumeReservedStock(
+        data: {
+            productId: string;
+            quantity: number;
+        },
+        tx?: Prisma.TransactionClient
+    ) {
+        const result = await this.inventoryRepository.consumeReservedStock(
+            data.productId,
+            data.quantity,
+            tx
+        );
+
+        if (result.count === 0) {
+            throw new BadRequestException(`Not enough reserved stock to consume for product with id ${data.productId}`);
+        }
+        
+        return result;
+    }
+
+    async releaseReservedStock(
+        data: {
+            productId: string;
+            quantity: number;
+        },
+        tx?: Prisma.TransactionClient
+    ) {
+        const result = await this.inventoryRepository.releaseReservedStock(
+            data.productId,
+            data.quantity,
+            tx
+        );
+
+        if (result.count === 0) {
+            throw new BadRequestException(`Not enough reserved stock to release for product with id ${data.productId}`);
+        }
+
+        return result;
+    }
 }
