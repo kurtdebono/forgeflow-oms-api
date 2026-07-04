@@ -55,6 +55,9 @@ export class OrdersRepository {
                 createdAt: 'desc'
             },
             include: {
+                user: {
+                    select: publicUserSelect
+                },
                 items: {
                     include: {
                         product: true

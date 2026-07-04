@@ -4,9 +4,7 @@ import { UsersRepository } from './users.repository';
 
 @Injectable()
 export class UsersService {
-    constructor(private readonly usersRepository: UsersRepository) {
-        
-    }
+    constructor(private readonly usersRepository: UsersRepository) {}
 
     create(data: Prisma.UserCreateInput) {
         return this.usersRepository.create(data);
@@ -26,7 +24,10 @@ export class UsersService {
         return this.usersRepository.findByEmail(email);
     }
 
-    updateRefreshTokenHash(userId: string, refreshTokenHash: string | null) {
+    updateRefreshTokenHash(
+        userId: string, 
+        refreshTokenHash: string | null
+    ) {
         return this.usersRepository.updateRefreshTokenHash(userId, refreshTokenHash);
     }
 }
