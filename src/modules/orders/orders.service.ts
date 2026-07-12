@@ -68,9 +68,9 @@ export class OrdersService {
     }
 
     async confirm(orderId: string) {
-        return this.prismaService.$transaction(async (tx) => {
+        return this.prismaService.$transaction(async (tx) => {            
             const order = await this.ordersRepository.findById(orderId, tx);
-
+            
             if (!order) {
                 throw new NotFoundException(`Order with id ${orderId} was not found.`);
             }
@@ -137,20 +137,20 @@ export class OrdersService {
                     },
                     tx
                 );
-
-                const updateResult = await this.ordersRepository.tryUpdateStatus(
-                    orderId,
-                    OrderStatus.PENDING,
-                    OrderStatus.CANCELLED,
-                    tx
-                );
-
-                if (updateResult.count === 0) {
-                    throw new BadRequestException('Order status has already changed.');
-                }
-
-                return this.ordersRepository.findById(orderId, tx);
             }
+
+            const updateResult = await this.ordersRepository.tryUpdateStatus(
+                orderId,
+                OrderStatus.PENDING,
+                OrderStatus.CANCELLED,
+                tx
+            );
+
+            if (updateResult.count === 0) {
+                throw new BadRequestException('Order status has already changed.');
+            }
+
+            return this.ordersRepository.findById(orderId, tx);
         });
     }
 

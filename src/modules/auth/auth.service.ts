@@ -107,11 +107,23 @@ export class AuthService {
         };
     }
 
+    private getJwtSecret(): string {
+        const secret = process.env.JWT_SECRET;
+
+        if(!secret) {
+            throw new Error('JWT_SECRET is not defined.');
+        }
+
+        return secret;
+    }
+
     private async generateTokens(user: {
         id: string;
         email: string;
         role: string;
     }) {
+        const secret = this.getJwtSecret();
+
         const payload = {
             sub: user.id,
             email: user.email,
@@ -122,6 +134,7 @@ export class AuthService {
             ...payload,
             jti: randomUUID()
         }, {
+            secret,
             expiresIn: (process.env.JWT_EXPIRES_IN ?? '15m') as any
         });
 
@@ -129,6 +142,7 @@ export class AuthService {
             ...payload,
             jti: randomUUID()
         }, {
+            secret,
             expiresIn: (process.env.JWT_REFRESH_EXPIRES_IN ?? '7d') as any
         });
 
