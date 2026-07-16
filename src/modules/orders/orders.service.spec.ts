@@ -102,7 +102,7 @@ describe('OrdersService', () => {
         const userId = 'user-1';
         const productId = 'product-1';
 
-        const product = {
+        const product: any = {
             id: productId,
             name: 'Keyboard',
             description: 'Mechanical keyboard',
@@ -112,7 +112,7 @@ describe('OrdersService', () => {
             updatedAt: new Date()
         };
 
-        const createdOrder = {
+        const createdOrder: any = {
             id: 'order-1',
             userId,
             status: OrderStatus.PENDING,
@@ -128,7 +128,7 @@ describe('OrdersService', () => {
         };
 
         productServiceMock.findById.mockResolvedValue(product);
-        inventoryServiceMock.reserveStock.mockResolvedValue({ coount: 1 });
+        inventoryServiceMock.reserveStock.mockResolvedValue({ count: 1 });
         ordersRepositoryMock.create.mockResolvedValue(createdOrder);
 
         const result = await ordersService.create(userId, {
@@ -236,7 +236,7 @@ describe('OrdersService', () => {
         const orderId = 'order-1';
         const productId = 'product-1';
 
-        const pendingOrder = {
+        const pendingOrder: any = {
             id: orderId,
             userId: 'user-1',
             status: OrderStatus.PENDING,
@@ -312,7 +312,7 @@ describe('OrdersService', () => {
         const userId = 'user-1';
         const productId = 'product-1';
 
-        const pendingOrder = {
+        const pendingOrder:any = {
             id: orderId,
             userId,
             status: OrderStatus.PENDING,
@@ -389,7 +389,7 @@ describe('OrdersService', () => {
     it('allows an admin to cancel any pending order', async () => {
         const orderId = 'order-1';
 
-        const pendingOrder = {
+        const pendingOrder: any = {
             id: orderId,
             userId: 'owner-user-id',
             status: OrderStatus.PENDING,

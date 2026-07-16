@@ -24,7 +24,7 @@ export class OrdersService {
             let totalAmount = new Prisma.Decimal(0);
 
             for (const item of data.items) {
-                const product = await this.productService.findById(item.productId, tx);            
+                const product:any = await this.productService.findById(item.productId, tx);
 
                 if(!product.isActive) {
                     throw new BadRequestException(`Product with id ${item.productId} is not active.`);

@@ -10,9 +10,11 @@ import { OrdersModule } from './modules/orders/orders.module';
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { DatabaseModule } from './infrastructure/database/database.module';
 import { PassportModule } from '@nestjs/passport';
+import { AppCacheModule } from './infrastructure/cache/app-cache.module';
 
 @Module({
   imports: [
+    AppCacheModule,
     ConfigModule.forRoot({ isGlobal: true }),
     AuthModule, 
     UsersModule, 
