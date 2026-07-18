@@ -7,7 +7,7 @@ import { Test } from '@nestjs/testing';
 import { OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { OrdersRepository } from './orders.repository';
-import { ProductRepository } from '../products/product.repository';
+import { OrderNotificationsProducer } from '../notifications/order-notifications.producer';
 import { InventoryService } from '../inventory/inventory.service';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 import { ProductService } from '../products/product.service';
@@ -16,6 +16,13 @@ type OrdersRepositoryMock = jest.Mocked<
     Pick<
         OrdersRepository,
         'create' | 'findByUserId' | 'findById' | 'tryUpdateStatus'
+    >
+>;
+
+type OrderNotificationsProducerMock = jest.Mocked<
+    Pick<
+        OrderNotificationsProducer,
+        'enqueueOrderConfirmedNotification'
     >
 >;
 
@@ -50,6 +57,7 @@ describe('OrdersService', () => {
     let productServiceMock: ProductServiceMock;
     let inventoryServiceMock: InventoryServiceMock;
     let prismaServiceMock: PrismaServiceMock;
+    let orderNotificationsProducerMock: OrderNotificationsProducerMock;
 
     beforeEach(async () => {
         ordersRepositoryMock = {
@@ -57,6 +65,10 @@ describe('OrdersService', () => {
             findById: jest.fn(),
             findByUserId: jest.fn(),
             tryUpdateStatus: jest.fn()
+        };
+
+        orderNotificationsProducerMock = {
+            enqueueOrderConfirmedNotification: jest.fn()
         };
 
         productServiceMock = {
@@ -91,6 +103,10 @@ describe('OrdersService', () => {
                 {
                     provide: PrismaService,
                     useValue: prismaServiceMock
+                },
+                {
+                    provide: OrderNotificationsProducer,
+                    useValue: orderNotificationsProducerMock
                 }
             ]
         }).compile();
@@ -285,6 +301,11 @@ describe('OrdersService', () => {
             tx
         );
 
+        expect(orderNotificationsProducerMock.enqueueOrderConfirmedNotification).toHaveBeenCalledWith({
+            orderId,
+            userId: 'user-1'
+        })
+
         expect(result).toBe(confirmedOrder);
     });
 
@@ -434,4 +455,19 @@ describe('OrdersService', () => {
         expect(inventoryServiceMock.consumeReservedStock).not.toHaveBeenCalled();
         expect(ordersRepositoryMock.tryUpdateStatus).not.toHaveBeenCalled();
     });
+
+    it('does not enqueue a notification when confirmation fails', async () => {
+        const orderId = 'order-1';
+
+        ordersRepositoryMock.findById.mockResolvedValue({
+            id: orderId,
+            userId: 'user-1',
+            status: OrderStatus.CONFIRMED,
+            items: []
+        });
+
+        await expect(ordersService.confirm(orderId)).rejects.toThrow(BadRequestException);
+
+        expect(orderNotificationsProducerMock.enqueueOrderConfirmedNotification).not.toHaveBeenCalled();
+    })
 });

@@ -7,6 +7,7 @@ import { InventoryService } from '../inventory/inventory.service';
 import { ProductService } from '../products/product.service';
 import { OrdersRepository } from './orders.repository';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
+import { OrderNotificationsProducer } from '../notifications/order-notifications.producer';
 
 @Injectable()
 export class OrdersService {
@@ -14,7 +15,8 @@ export class OrdersService {
         private readonly ordersRepository: OrdersRepository,
         private readonly productService: ProductService,
         private readonly inventoryService: InventoryService,
-        private readonly prismaService: PrismaService
+        private readonly prismaService: PrismaService,
+        private readonly orderNotificationsProducer: OrderNotificationsProducer
     ) {}
 
     async create(userId: string, data: CreateOrderDto) {
@@ -68,7 +70,7 @@ export class OrdersService {
     }
 
     async confirm(orderId: string) {
-        return this.prismaService.$transaction(async (tx) => {            
+        const confirmedOrder: any = await this.prismaService.$transaction(async (tx) => {            
             const order = await this.ordersRepository.findById(orderId, tx);
             
             if (!order) {
@@ -102,6 +104,17 @@ export class OrdersService {
 
             return this.ordersRepository.findById(orderId, tx);
         });
+
+        if(!confirmedOrder) {
+            throw new NotFoundException('Order not found');
+        }
+
+        await this.orderNotificationsProducer.enqueueOrderConfirmedNotification({
+            orderId: confirmedOrder.id,
+            userId: confirmedOrder.userId
+        });
+
+        return confirmedOrder;
     }
 
     async cancel(
