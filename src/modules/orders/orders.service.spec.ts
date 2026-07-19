@@ -11,6 +11,7 @@ import { OrderNotificationsProducer } from '../notifications/order-notifications
 import { InventoryService } from '../inventory/inventory.service';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 import { ProductService } from '../products/product.service';
+import { IdempotencyService } from '../idempotency/idempotency.service';
 
 type OrdersRepositoryMock = jest.Mocked<
     Pick<
@@ -40,6 +41,13 @@ type InventoryServiceMock = jest.Mocked<
     >
 >;
 
+type IdempotencyServiceMock = jest.Mocked<
+    Pick<
+        IdempotencyService,
+        'checkExisting' | 'claim' | 'complete' | 'createRequestHash' | 'resolveCompletedOrder'
+    >
+>;
+
 type PrismaServiceMock = {
     $transaction: jest.MockedFunction<
         <T>(
@@ -58,6 +66,7 @@ describe('OrdersService', () => {
     let inventoryServiceMock: InventoryServiceMock;
     let prismaServiceMock: PrismaServiceMock;
     let orderNotificationsProducerMock: OrderNotificationsProducerMock;
+    let idempotencyServiceMock: IdempotencyServiceMock;
 
     beforeEach(async () => {
         ordersRepositoryMock = {
@@ -81,6 +90,14 @@ describe('OrdersService', () => {
             releaseReservedStock: jest.fn()
         };
 
+        idempotencyServiceMock = {
+            resolveCompletedOrder: jest.fn(),
+            createRequestHash: jest.fn(),
+            complete: jest.fn(),
+            claim: jest.fn(),
+            checkExisting: jest.fn()
+        }
+
         prismaServiceMock = {
             $transaction: jest.fn(async <T>(callback) => callback(tx) )
         }
@@ -99,6 +116,10 @@ describe('OrdersService', () => {
                 {
                     provide: InventoryService,
                     useValue: inventoryServiceMock
+                },
+                {
+                    provide: IdempotencyService,
+                    useValue: idempotencyServiceMock
                 },
                 {
                     provide: PrismaService,
@@ -147,14 +168,30 @@ describe('OrdersService', () => {
         inventoryServiceMock.reserveStock.mockResolvedValue({ count: 1 });
         ordersRepositoryMock.create.mockResolvedValue(createdOrder);
 
-        const result = await ordersService.create(userId, {
+        idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
+
+        idempotencyServiceMock.checkExisting.mockResolvedValue({
+            exists: false
+        });
+
+        idempotencyServiceMock.claim.mockResolvedValue({
+            claimed: true,
+            recordId: 'idempotency-record-1'
+        });
+
+        idempotencyServiceMock.complete.mockResolvedValue(undefined);
+
+        const createOrderDto = {
+
             items: [
                 {
                     productId,
                     quantity: 2
                 }
             ]
-        });
+        };
+
+        const result = await ordersService.create(userId, createOrderDto, 'idempotency-key-1');
 
         expect(prismaServiceMock.$transaction).toHaveBeenCalledTimes(1);
         expect(productServiceMock.findById).toHaveBeenCalledWith(productId, tx);
@@ -163,6 +200,12 @@ describe('OrdersService', () => {
         const [orderCreateData, transactionClient] = ordersRepositoryMock.create.mock.calls[0];
 
         expect(transactionClient).toBe(tx);
+
+        expect(idempotencyServiceMock.complete).toHaveBeenCalledWith({
+            recordId: 'idempotency-record-1',
+            orderId: result.id,
+            tx
+        });
 
         expect(orderCreateData.user).toEqual({
             connect: {
@@ -203,6 +246,19 @@ describe('OrdersService', () => {
             updatedAt: new Date()
         });
 
+        idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
+
+        idempotencyServiceMock.checkExisting.mockResolvedValue({
+            exists: false
+        });
+
+        idempotencyServiceMock.claim.mockResolvedValue({
+            claimed: true,
+            recordId: 'idempotency-record-1'
+        });
+
+        idempotencyServiceMock.complete.mockResolvedValue(undefined);
+
         await expect(
             ordersService.create(userId, {
                 items: [
@@ -213,6 +269,8 @@ describe('OrdersService', () => {
                 ]
             })
         ).rejects.toThrow(BadRequestException);
+
+        expect(idempotencyServiceMock.complete).not.toHaveBeenCalled();
 
         expect(inventoryServiceMock.reserveStock).not.toHaveBeenCalled();
         expect(ordersRepositoryMock.create).not.toHaveBeenCalled();
@@ -232,6 +290,19 @@ describe('OrdersService', () => {
             updatedAt: new Date()
         });
 
+        idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
+
+        idempotencyServiceMock.checkExisting.mockResolvedValue({
+            exists: false
+        });
+
+        idempotencyServiceMock.claim.mockResolvedValue({
+            claimed: true,
+            recordId: 'idempotency-record-1'
+        });
+
+        idempotencyServiceMock.complete.mockResolvedValue(undefined);
+
         inventoryServiceMock.reserveStock.mockRejectedValue(
             new BadRequestException('Insufficient Stock.')
         );
@@ -246,6 +317,8 @@ describe('OrdersService', () => {
                 ]
             })
         ).rejects.toThrow(BadRequestException);
+
+        expect(idempotencyServiceMock.complete).not.toHaveBeenCalled();
     });
 
     it('confirms a pending order and consumes reserved stock', async () => {
@@ -469,5 +542,97 @@ describe('OrdersService', () => {
         await expect(ordersService.confirm(orderId)).rejects.toThrow(BadRequestException);
 
         expect(orderNotificationsProducerMock.enqueueOrderConfirmedNotification).not.toHaveBeenCalled();
-    })
+    });
+
+    it('returns existing order when idempotency key was already completed', async () => {
+        const existingOrder = {
+            id: 'order-1',
+            userId: 'user-1',
+            status: OrderStatus.PENDING,
+            totalAmount: new Prisma.Decimal(50),
+            items: [],
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+
+        idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
+
+        idempotencyServiceMock.checkExisting.mockResolvedValue({
+            exists: true,
+            orderId: existingOrder.id
+        });
+
+        ordersRepositoryMock.findById.mockResolvedValue(existingOrder);
+
+        const result = await ordersService.create(
+            'user-1',
+            {
+                items: [
+                    {
+                        productId: 'product-1',
+                        quantity: 1
+                    }
+                ]
+            },
+            'idempotency-key-1'
+        );
+
+        expect(result).toBe(existingOrder);
+
+        expect(prismaServiceMock.$transaction).not.toHaveBeenCalled();
+        expect(productServiceMock.findById).not.toHaveBeenCalled();
+        expect(inventoryServiceMock.reserveStock).not.toHaveBeenCalled();
+        expect(ordersRepositoryMock.create).not.toHaveBeenCalled();
+    });
+
+    it('returns existing order when idempotency claim is lost due to duplicate key', async () => {
+        const existingOrder = {
+            id: 'order-1',
+            userId: 'user-1',
+            status: OrderStatus.PENDING,
+            totalAmount: new Prisma.Decimal(50),
+            items: [],
+            createdAt: new Date(),
+            updatedAt: new Date()
+        };
+
+        idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
+
+        idempotencyServiceMock.checkExisting.mockResolvedValueOnce({
+            exists: false
+        }).mockResolvedValueOnce({
+            exists: true,
+            orderId: existingOrder.id
+        });
+
+        idempotencyServiceMock.claim.mockResolvedValue({
+            claimed: false,
+            reason: 'DUPLICATE_KEY'
+        });
+
+        ordersRepositoryMock.findById.mockResolvedValue(existingOrder);
+
+        prismaServiceMock.$transaction.mockImplementation(async (callback) => {
+            return callback(tx);
+        });
+
+        const result = await ordersService.create(
+            'user-1',
+            {
+                items: [
+                    {
+                        productId: 'product-1',
+                        quantity: 1
+                    }
+                ]
+            },
+            'idempotency-key-1'
+        );
+
+        expect(result).toBe(existingOrder);
+
+        expect(idempotencyServiceMock.claim).toHaveBeenCalled();
+        expect(ordersRepositoryMock.create).not.toHaveBeenCalled();
+        expect(inventoryServiceMock.reserveStock).not.toHaveBeenCalled();
+    });
 });

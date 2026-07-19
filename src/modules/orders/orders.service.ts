@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException, ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { OrderStatus, Prisma, UserRole } from '@prisma/client';
 
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -8,6 +8,8 @@ import { ProductService } from '../products/product.service';
 import { OrdersRepository } from './orders.repository';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 import { OrderNotificationsProducer } from '../notifications/order-notifications.producer';
+import { IdempotencyService } from '../idempotency/idempotency.service';
+import { IdempotencyOperations } from '../idempotency/idempotency.constants';
 
 @Injectable()
 export class OrdersService {
@@ -16,12 +18,15 @@ export class OrdersService {
         private readonly productService: ProductService,
         private readonly inventoryService: InventoryService,
         private readonly prismaService: PrismaService,
-        private readonly orderNotificationsProducer: OrderNotificationsProducer
+        private readonly orderNotificationsProducer: OrderNotificationsProducer,
+        private readonly idempotencyService: IdempotencyService
     ) {}
 
-    async create(userId: string, data: CreateOrderDto) {
-        return this.prismaService.$transaction(async (tx) => {
-            const orderItems: Prisma.OrderItemCreateWithoutOrderInput[] = [];
+    private async createOrderInsideTransaction(
+        userId: string,
+        data: CreateOrderDto,
+        tx: Prisma.TransactionClient) {
+        const orderItems: Prisma.OrderItemCreateWithoutOrderInput[] = [];
 
             let totalAmount = new Prisma.Decimal(0);
 
@@ -66,7 +71,99 @@ export class OrdersService {
             };
 
             return this.ordersRepository.create(orderCreateInput, tx);
-        });        
+    }
+
+    async create(
+        userId: string, 
+        data: CreateOrderDto,
+        idempotencyKey: string
+    ) {
+        const operation = IdempotencyOperations.CREATE_ORDER;
+
+        const requestHash = this.idempotencyService.createRequestHash({
+            item: data.items
+        });
+
+        const existResult = await this.idempotencyService.checkExisting({
+            userId,
+            operation,
+            key: idempotencyKey,
+            requestHash
+        });
+
+        if(existResult.exists) {
+            const existingOrder = await this.ordersRepository.findById(existResult.orderId);
+
+            if(!existingOrder) {
+                throw new InternalServerErrorException(
+                    'Idempotency record points to an order that no longer exists.'
+                );
+            }
+
+            return existingOrder;
+        }
+
+        const result = await this.prismaService.$transaction(async (tx) => {
+            const claim = await this.idempotencyService.claim({
+                userId,
+                operation,
+                key: idempotencyKey,
+                requestHash,
+                tx
+            });
+
+            if(!claim.claimed) {
+                return {
+                    duplicate: true as const
+                };
+            }
+
+            const order = await this.createOrderInsideTransaction(
+                userId,
+                data,
+                tx
+            );
+
+            await this.idempotencyService.complete({
+                recordId: claim.recordId,
+                orderId: order.id,
+                tx
+            });
+
+            return {
+                deuplicate: false as const,
+                order
+            }
+        });
+
+        if (result.duplicate) {
+            const existingAfterRace = await this.idempotencyService.checkExisting({
+                userId,
+                operation,
+                key: idempotencyKey,
+                requestHash
+            });
+
+            if(existingAfterRace.exists) {
+                const existingOrder = await this.ordersRepository.findById(
+                    existingAfterRace.orderId
+                );
+
+                if(!existingOrder) {
+                    throw new InternalServerErrorException(
+                        'Idempotency record points to an order that no longer exists.'
+                    );
+                }
+
+                return existingOrder;
+            }
+
+            throw new ConflictException(
+                'A request with this idempotency key is already in progress.'
+            );
+        }
+        
+        return result.order;
     }
 
     async confirm(orderId: string) {

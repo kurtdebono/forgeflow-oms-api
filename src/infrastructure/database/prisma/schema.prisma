@@ -18,17 +18,23 @@ enum OrderStatus {
   FAILED
 }
 
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
 model User {
-  id                String   @id @default(uuid())
-  email             String   @unique
-  passwordHash      String
-  refreshTokenHash  String?
-  role              UserRole @default(CUSTOMER)
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String
+  refreshTokenHash    String?
+  role                UserRole @default(CUSTOMER)
 
-  orders            Order[]
+  orders              Order[]
+  idempotencyRecords IdempotencyRecord[]
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Product {
@@ -46,7 +52,7 @@ model Product {
 }
 
 model Inventory {
-  id                String  @id @default(uuid())
+  id                 String  @id @default(uuid())
   productId          String  @unique
   availableQuantity  Int
   reservedQuantity   Int     @default(0)
@@ -58,16 +64,17 @@ model Inventory {
 }
 
 model Order {
-  id          String      @id @default(uuid())
-  userId      String
-  status      OrderStatus @default(PENDING)
-  totalAmount Decimal     @db.Decimal(10, 2)
+  id                  String      @id @default(uuid())
+  userId              String
+  status              OrderStatus @default(PENDING)
+  totalAmount         Decimal     @db.Decimal(10, 2)
 
-  user        User        @relation(fields: [userId], references: [id])
-  items       OrderItem[]
+  user                User        @relation(fields: [userId], references: [id])
+  items               OrderItem[]
+  idemPotenctRecords  IdempotencyRecord[]
 
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
 }
 
 model OrderItem {
@@ -81,4 +88,27 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+model IdempotencyRecord {
+  id            String            @id @default(uuid())
+  
+  userId        String
+  operation     String
+  key           String
+  requestHash   String
+  
+  status        IdempotencyStatus @default(IN_PROGRESS)
+  
+  orderId       String?
+
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         Order?            @relation(fields: [orderId], references: [id])
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([userId, operation, key])
+  @@index([userId])
+  @@index([orderId])
 }

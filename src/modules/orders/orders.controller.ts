@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { BadRequestException, Headers, Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/strategies/jwt-auth.guard';
@@ -18,8 +18,16 @@ export class OrdersController {
     @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
     create(
         @CurrentUser() user: CurrentUser,
-        @Body() body: CreateOrderDto) {        
-        return this.ordersService.create(user.userId, body);
+        @Body() body: CreateOrderDto,
+        @Headers('idempotency-key') idempotencyKey?: string) {            
+        if(!idempotencyKey?.trim()) {
+            throw new BadRequestException('Idempotency-key header is required');
+        }
+        return this.ordersService.create(
+            user.userId, 
+            body,
+            idempotencyKey.trim()
+        );
     }
 
     @Get('my')
