@@ -14,6 +14,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AppCacheModule } from './infrastructure/cache/app-cache.module';
 import { AppQueueModule } from './infrastructure/queue/app-queue.module';
 import { IdempotencyModule } from './modules/idempotency/idempotency.module';
+import { OrderIntelligenceModule } from './modules/order-intelligence/order-intelligence.module';
 
 @Module({
   imports: [
@@ -28,7 +29,8 @@ import { IdempotencyModule } from './modules/idempotency/idempotency.module';
     InventoryModule, 
     IdempotencyModule,
     DatabaseModule,
-    PassportModule
+    PassportModule,
+    OrderIntelligenceModule
   ],
   controllers: [AppController],
   providers: [AppService],

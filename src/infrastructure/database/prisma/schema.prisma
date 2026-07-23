@@ -29,6 +29,12 @@ enum OutboxEventStatus {
   FAILED
 }
 
+enum OrderAnalysisPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 model User {
   id                  String   @id @default(uuid())
   email               String   @unique
@@ -81,6 +87,7 @@ model Order {
 
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
+  analysis            OrderAnalysis[]
 }
 
 model OrderItem {
@@ -94,6 +101,30 @@ model OrderItem {
   product   Product @relation(fields: [productId], references: [id])
 
   createdAt DateTime @default(now())
+}
+
+model OrderAnalysis {
+  id                    String    @id @default(uuid())
+
+  orderId               String
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  summary               String
+  priority              OrderAnalysisPriority
+
+  riskFlags             Json
+  missingInformation    Json
+  recommendedActions    Json
+  customerExplanation   String
+
+  provider              String
+  model                 String
+  rawResponse           Json?
+
+  createdAt             DateTime    @default(now())
+
+  @@index([orderId])
+  @@index([priority])
 }
 
 model IdempotencyRecord {

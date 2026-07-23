@@ -16,6 +16,7 @@ import { OutboxModule } from '../outbox/outbox.module';
         OutboxModule
     ],
     controllers: [OrdersController],
-    providers: [OrdersService, OrdersRepository]    
+    providers: [OrdersService, OrdersRepository],
+    exports: [OrdersService]
 })
 export class OrdersModule {}
