@@ -1,7 +1,8 @@
 import {
     Inject,
     Injectable,
-    NotFoundException
+    NotFoundException,
+    BadGatewayException
 } from '@nestjs/common';
 import { OrderAnalysisPriority } from '@prisma/client';
 import { OrdersService } from '../orders/orders.service';
@@ -45,7 +46,15 @@ export class OrderIntelligenceService {
 
         const aiResult = await this.aiProvider.generateOrderAnalysis(input);
 
-        const validated = orderAnalysisSchema.parse(aiResult);
+        const validationResult = orderAnalysisSchema.safeParse(aiResult);
+
+        if(!validationResult.success) {
+            throw new BadGatewayException(
+                'AI Provider return an invalid order analaysis response.'
+            );
+        }
+
+        const validated = validationResult.data;
 
         return this.orderAnalysisRepository.create({
             orderId: order.id,
