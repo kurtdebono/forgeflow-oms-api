@@ -23,6 +23,12 @@ enum IdempotencyStatus {
   COMPLETED
 }
 
+enum OutboxEventStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
 model User {
   id                  String   @id @default(uuid())
   email               String   @unique
@@ -111,4 +117,22 @@ model IdempotencyRecord {
   @@unique([userId, operation, key])
   @@index([userId])
   @@index([orderId])
+}
+
+model OutboxEvent {
+  id            String              @id @default(uuid())
+
+  eventType     String
+  payload       Json
+
+  status        OutboxEventStatus   @default(PENDING)
+  attempts      Int                 @default(0)
+  lastError     String?
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  publishedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([eventType])
 }

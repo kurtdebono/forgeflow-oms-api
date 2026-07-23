@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -16,6 +17,7 @@ import { IdempotencyModule } from './modules/idempotency/idempotency.module';
 
 @Module({
   imports: [
+    ScheduleModule.forRoot(),
     AppQueueModule,
     AppCacheModule,
     ConfigModule.forRoot({ isGlobal: true }),

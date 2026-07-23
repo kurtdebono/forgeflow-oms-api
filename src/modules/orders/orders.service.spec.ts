@@ -7,23 +7,17 @@ import { Test } from '@nestjs/testing';
 import { OrderStatus, Prisma, UserRole } from '@prisma/client';
 import { OrdersService } from './orders.service';
 import { OrdersRepository } from './orders.repository';
-import { OrderNotificationsProducer } from '../notifications/order-notifications.producer';
 import { InventoryService } from '../inventory/inventory.service';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 import { ProductService } from '../products/product.service';
 import { IdempotencyService } from '../idempotency/idempotency.service';
+import { OutboxService } from '../outbox/outbox.service';
+import { OutboxEventTypes } from '../outbox/outbox.constants';
 
 type OrdersRepositoryMock = jest.Mocked<
     Pick<
         OrdersRepository,
         'create' | 'findByUserId' | 'findById' | 'tryUpdateStatus'
-    >
->;
-
-type OrderNotificationsProducerMock = jest.Mocked<
-    Pick<
-        OrderNotificationsProducer,
-        'enqueueOrderConfirmedNotification'
     >
 >;
 
@@ -44,9 +38,17 @@ type InventoryServiceMock = jest.Mocked<
 type IdempotencyServiceMock = jest.Mocked<
     Pick<
         IdempotencyService,
-        'checkExisting' | 'claim' | 'complete' | 'createRequestHash' | 'resolveCompletedOrder'
+        'checkExisting' | 'claim' | 'complete' | 'createRequestHash'
     >
 >;
+
+type OutboxServiceMock = jest.Mocked<
+    Pick<
+        OutboxService,
+        'createEvent'
+    >
+>;
+
 
 type PrismaServiceMock = {
     $transaction: jest.MockedFunction<
@@ -64,9 +66,9 @@ describe('OrdersService', () => {
     let ordersRepositoryMock: OrdersRepositoryMock;
     let productServiceMock: ProductServiceMock;
     let inventoryServiceMock: InventoryServiceMock;
-    let prismaServiceMock: PrismaServiceMock;
-    let orderNotificationsProducerMock: OrderNotificationsProducerMock;
+    let prismaServiceMock: PrismaServiceMock;    
     let idempotencyServiceMock: IdempotencyServiceMock;
+    let outboxServiceMock: OutboxServiceMock;
 
     beforeEach(async () => {
         ordersRepositoryMock = {
@@ -74,10 +76,6 @@ describe('OrdersService', () => {
             findById: jest.fn(),
             findByUserId: jest.fn(),
             tryUpdateStatus: jest.fn()
-        };
-
-        orderNotificationsProducerMock = {
-            enqueueOrderConfirmedNotification: jest.fn()
         };
 
         productServiceMock = {
@@ -90,17 +88,20 @@ describe('OrdersService', () => {
             releaseReservedStock: jest.fn()
         };
 
-        idempotencyServiceMock = {
-            resolveCompletedOrder: jest.fn(),
+        idempotencyServiceMock = {            
             createRequestHash: jest.fn(),
             complete: jest.fn(),
             claim: jest.fn(),
             checkExisting: jest.fn()
-        }
+        };
+
+        outboxServiceMock = {
+            createEvent: jest.fn()
+        };
 
         prismaServiceMock = {
             $transaction: jest.fn(async <T>(callback) => callback(tx) )
-        }
+        };
 
         const moduleRef = await Test.createTestingModule({
             providers: [
@@ -122,13 +123,13 @@ describe('OrdersService', () => {
                     useValue: idempotencyServiceMock
                 },
                 {
-                    provide: PrismaService,
-                    useValue: prismaServiceMock
+                    provide: OutboxService,
+                    useValue: outboxServiceMock
                 },
                 {
-                    provide: OrderNotificationsProducer,
-                    useValue: orderNotificationsProducerMock
-                }
+                    provide: PrismaService,
+                    useValue: prismaServiceMock
+                }                
             ]
         }).compile();
 
@@ -267,7 +268,7 @@ describe('OrdersService', () => {
                         quantity: 1
                     }
                 ]
-            })
+            }, 'idempotency-key-1')
         ).rejects.toThrow(BadRequestException);
 
         expect(idempotencyServiceMock.complete).not.toHaveBeenCalled();
@@ -315,7 +316,7 @@ describe('OrdersService', () => {
                         quantity: 10
                     }
                 ]
-            })
+            }, 'idempotency-key-1')
         ).rejects.toThrow(BadRequestException);
 
         expect(idempotencyServiceMock.complete).not.toHaveBeenCalled();
@@ -374,10 +375,16 @@ describe('OrdersService', () => {
             tx
         );
 
-        expect(orderNotificationsProducerMock.enqueueOrderConfirmedNotification).toHaveBeenCalledWith({
-            orderId,
-            userId: 'user-1'
-        })
+        expect(outboxServiceMock.createEvent).toHaveBeenCalledWith(
+            {
+                eventType: OutboxEventTypes.ORDER_CONFIRMED,
+                payload: {
+                    orderId,
+                    userId: 'user-1'
+                }
+            },
+            tx
+        );
 
         expect(result).toBe(confirmedOrder);
     });
@@ -541,7 +548,7 @@ describe('OrdersService', () => {
 
         await expect(ordersService.confirm(orderId)).rejects.toThrow(BadRequestException);
 
-        expect(orderNotificationsProducerMock.enqueueOrderConfirmedNotification).not.toHaveBeenCalled();
+        expect(outboxServiceMock.createEvent).not.toHaveBeenCalled();
     });
 
     it('returns existing order when idempotency key was already completed', async () => {
@@ -634,5 +641,22 @@ describe('OrdersService', () => {
         expect(idempotencyServiceMock.claim).toHaveBeenCalled();
         expect(ordersRepositoryMock.create).not.toHaveBeenCalled();
         expect(inventoryServiceMock.reserveStock).not.toHaveBeenCalled();
+    });
+
+    it('does not create an outbox event when confirmation fails', async () => {
+        const orderId = 'order-1';
+
+        ordersRepositoryMock.findById.mockResolvedValue({
+            id: orderId,
+            userId: 'user-1',
+            status: OrderStatus.CONFIRMED,
+            items: []
+        });
+
+        await expect(ordersService.confirm(orderId)).rejects.toThrow(
+            BadRequestException
+        );
+
+        expect(outboxServiceMock.createEvent).not.toHaveBeenCalled();
     });
 });

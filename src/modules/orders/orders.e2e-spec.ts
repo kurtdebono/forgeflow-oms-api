@@ -3,11 +3,12 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { config } from 'dotenv';
 import request from 'supertest';
 import * as bcrypt from 'bcrypt';
-import { OrderStatus, Prisma, UserRole } from '@prisma/client';
+import { OrderStatus, OutboxEventStatus, Prisma, UserRole } from '@prisma/client';
 
 import { AppModule } from '../../app.module';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 import { create } from 'domain';
+import { OutboxEventTypes } from '../outbox/outbox.constants';
 
 describe('Auth / Products / Orders e2e', () => {
     let app: INestApplication;
@@ -39,6 +40,7 @@ describe('Auth / Products / Orders e2e', () => {
     });
 
     beforeEach(async () => {
+        await prisma.outboxEvent.deleteMany();
         await prisma.idempotencyRecord.deleteMany();
         await prisma.orderItem.deleteMany();
         await prisma.order.deleteMany();
@@ -265,6 +267,19 @@ describe('Auth / Products / Orders e2e', () => {
             where: {
                 productId: product.id,
             }
+        });
+
+        const outboxEvents = await prisma.outboxEvent.findMany({
+            where: {
+                eventType: OutboxEventTypes.ORDER_CONFIRMED
+            }
+        });
+
+        expect(outboxEvents).toHaveLength(1);
+        expect(outboxEvents[0].status).toBe(OutboxEventStatus.PENDING);
+        expect(outboxEvents[0].payload).toEqual({
+            orderId: createOrderResponse.body.id,
+            userId: customer.id
         });
 
         expect(inventoryAfterConfirm.availableQuantity).toBe(8);

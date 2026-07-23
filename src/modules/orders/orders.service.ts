@@ -7,9 +7,10 @@ import { InventoryService } from '../inventory/inventory.service';
 import { ProductService } from '../products/product.service';
 import { OrdersRepository } from './orders.repository';
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
-import { OrderNotificationsProducer } from '../notifications/order-notifications.producer';
 import { IdempotencyService } from '../idempotency/idempotency.service';
 import { IdempotencyOperations } from '../idempotency/idempotency.constants';
+import { OutboxService } from '../outbox/outbox.service';
+import { OutboxEventTypes } from '../outbox/outbox.constants';
 
 @Injectable()
 export class OrdersService {
@@ -17,9 +18,9 @@ export class OrdersService {
         private readonly ordersRepository: OrdersRepository,
         private readonly productService: ProductService,
         private readonly inventoryService: InventoryService,
-        private readonly prismaService: PrismaService,
-        private readonly orderNotificationsProducer: OrderNotificationsProducer,
-        private readonly idempotencyService: IdempotencyService
+        private readonly prismaService: PrismaService,        
+        private readonly idempotencyService: IdempotencyService,
+        private readonly outboxService: OutboxService
     ) {}
 
     private async createOrderInsideTransaction(
@@ -199,18 +200,24 @@ export class OrdersService {
                 throw new BadRequestException('Order status has already changed.');
             }
 
+            await this.outboxService.createEvent(
+                {
+                    eventType: OutboxEventTypes.ORDER_CONFIRMED,
+                    payload: {
+                        orderId: order.id,
+                        userId: order.userId
+                    }
+                },
+                tx
+            )
+
             return this.ordersRepository.findById(orderId, tx);
         });
 
         if(!confirmedOrder) {
             throw new NotFoundException('Order not found');
         }
-
-        await this.orderNotificationsProducer.enqueueOrderConfirmedNotification({
-            orderId: confirmedOrder.id,
-            userId: confirmedOrder.userId
-        });
-
+        
         return confirmedOrder;
     }
 
