@@ -23,4 +23,11 @@ export class FakeAIProvider implements AIProvider {
                 'Your order is being reviewed and processed by our operations team.'
         };
     }
+
+    getMetadata() {
+        return {
+            provider: 'fake',
+            model: 'fake-order-analysis-v1'
+        }
+    }
 }

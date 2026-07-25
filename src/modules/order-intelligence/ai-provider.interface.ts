@@ -22,6 +22,13 @@ export type OrderAnalysisResult = {
 
 export const AI_PROVIDER = Symbol('AI_PROVIDER');
 
+export type AIProviderMetadata = {
+    provider: string;
+    model: string;
+}
+
 export interface AIProvider {
     generateOrderAnalysis(input: OrderAnalysisInput): Promise<OrderAnalysisResult>;
+
+    getMetadata(): AIProviderMetadata
 }

@@ -5,6 +5,7 @@ import { FakeAIProvider } from './fake-ai.provider';
 import { OrderAnalysisRepository } from './order-analysis.repository';
 import { OrderIntelligenceController } from './order-intelligence.controller';
 import { OrderIntelligenceService } from './order-intelligence.service';
+import { OpenAIProvider } from './openai.provider';
 
 @Module({
     imports: [OrdersModule],
@@ -14,7 +15,10 @@ import { OrderIntelligenceService } from './order-intelligence.service';
         OrderAnalysisRepository,
         {
             provide: AI_PROVIDER,
-            useClass: FakeAIProvider
+            useClass: 
+                process.env.AI_PROVIDER === 'openai'
+                    ? OpenAIProvider
+                    : FakeAIProvider
         }
     ]
 })

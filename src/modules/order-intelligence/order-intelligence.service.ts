@@ -47,6 +47,7 @@ export class OrderIntelligenceService {
         const aiResult = await this.aiProvider.generateOrderAnalysis(input);
 
         const validationResult = orderAnalysisSchema.safeParse(aiResult);
+        const metadata = this.aiProvider.getMetadata();
 
         if(!validationResult.success) {
             throw new BadGatewayException(
@@ -64,8 +65,8 @@ export class OrderIntelligenceService {
             missingInformation: validated.missingInformation,
             recommendedActions: validated.recommendedActions,
             customerExplanation: validated.customerExplanation,
-            provider: 'fake',
-            model: 'fake-order-analysis-v1',
+            provider: metadata.provider,
+            model: metadata.model,
             rawResponse: validated
         });
     }
