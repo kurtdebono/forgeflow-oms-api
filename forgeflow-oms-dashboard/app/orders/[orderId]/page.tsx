@@ -1,69 +1,23 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import {
-  generateOrderAnalysis,
-  getOrder,
-  getOrderAnalysis,
-} from '@/lib/api';
-import type { Order, OrderAnalysis } from '@/types/api';
 import { AnalysisPanel } from '@/components/AnalysisPanel';
 import { StatusBadge } from '@/components/StatusBadge';
+import { useOrderDetails } from '@/hooks/useOrderDetails';
 
 export default function OrderDetailPage() {
   const params = useParams<{ orderId: string }>();
   const orderId = params.orderId;
 
-  const [order, setOrder] = useState<Order | null>(null);
-  const [analyses, setAnalyses] = useState<OrderAnalysis[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function loadOrderDetails() {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const [orderResult, analysesResult] = await Promise.all([
-        getOrder(orderId),
-        getOrderAnalysis(orderId),
-      ]);
-
-      setOrder(orderResult);
-      setAnalyses(analysesResult);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : 'Failed to load order.',
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function handleGenerateAnalysis() {
-    setIsGenerating(true);
-    setError(null);
-
-    try {
-      const analysis = await generateOrderAnalysis(orderId);
-      setAnalyses((current) => [analysis, ...current]);
-    } catch (error) {
-      setError(
-        error instanceof Error
-          ? error.message
-          : 'Failed to generate analysis.',
-      );
-    } finally {
-      setIsGenerating(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadOrderDetails();
-  }, [orderId]);
+  const {
+    order,
+    analyses,
+    isLoading,
+    error,
+    isGenerating,
+    generateAnalysis,
+  } = useOrderDetails(orderId);
 
   return (
     <main className="min-h-screen p-8">
@@ -97,7 +51,9 @@ export default function OrderDetailPage() {
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
                   <p className="text-sm text-gray-500">Order ID</p>
-                  <p className="mt-1 break-all font-mono text-sm">{order.id}</p>
+                  <p className="mt-1 break-all font-mono text-sm">
+                    {order.id}
+                  </p>
                 </div>
 
                 <div>
@@ -146,7 +102,7 @@ export default function OrderDetailPage() {
             <AnalysisPanel
               analyses={analyses}
               isGenerating={isGenerating}
-              onGenerate={handleGenerateAnalysis}
+              onGenerate={generateAnalysis}
             />
           </>
         )}

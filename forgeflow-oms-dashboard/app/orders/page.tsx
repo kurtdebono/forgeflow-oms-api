@@ -1,36 +1,18 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getOrders } from '@/lib/api';
 import type { Order } from '@/types/api';
 import { OrderCard } from '@/components/OrderCard';
+import { useAsyncData } from '../../hooks/useAsyncData';
+
+export function useOrders() {
+  return useAsyncData<Order[]>(getOrders, []);
+}
 
 export default function OrdersPage() {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  async function loadOrders() {
-    setIsLoading(true);
-    setError(null);
-
-    try {
-      const result = await getOrders();
-      setOrders(result);
-    } catch (error) {
-      setError(
-        error instanceof Error ? error.message : 'Failed to load orders.',
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    void loadOrders();
-  }, []);
-
+  const { data: orders, isLoading, error } = useOrders();
+  
   return (
     <main className="min-h-screen p-8">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -62,14 +44,14 @@ export default function OrdersPage() {
           </div>
         )}
 
-        {!isLoading && !error && orders.length === 0 && (
+        {!orders || orders?.length === 0 && (
           <div className="rounded-xl border p-5 text-gray-600">
             No orders found.
           </div>
         )}
 
         <div className="space-y-4">
-          {orders.map((order) => (
+          {orders?.map((order) => (
             <OrderCard key={order.id} order={order} />
           ))}
         </div>

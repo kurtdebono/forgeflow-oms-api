@@ -1,6 +1,6 @@
 import type { OrderAnalysis } from '@/types/api';
 
-import { PriorityBadge } from './PriorityBadge';
+import { Priority } from './Priority';
 
 type AnalysisPanelProps = {
   analyses: OrderAnalysis[];
@@ -43,7 +43,7 @@ export function AnalysisPanel({
       {latestAnalysis && (
         <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3">
-            <PriorityBadge priority={latestAnalysis.priority} />
+            <Priority priority={latestAnalysis.priority} />
             <p className="text-sm text-gray-500">
               Provider: {latestAnalysis.provider} · Model: {latestAnalysis.model}
             </p>

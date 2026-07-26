@@ -1,6 +1,10 @@
-import { OrderAnalysis } from "@/types/api";
+import type { OrderAnalysis } from '@/types/api';
 
-export function PriorityBadge({ priority }: { priority: OrderAnalysis['priority'] }) {
+type PriorityProps = {
+  priority: OrderAnalysis['priority'];
+};
+
+export function Priority({ priority }: PriorityProps) {
   const className =
     priority === 'HIGH'
       ? 'border-red-300 bg-red-50 text-red-700'
@@ -9,7 +13,9 @@ export function PriorityBadge({ priority }: { priority: OrderAnalysis['priority'
         : 'border-green-300 bg-green-50 text-green-700';
 
   return (
-    <span className={`rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}>
+    <span
+      className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${className}`}
+    >
       {priority}
     </span>
   );
