@@ -12,6 +12,7 @@ import {
 } from './ai-provider.interface';
 import { OrderAnalysisRepository } from './order-analysis.repository';
 import { orderAnalysisSchema } from './schemas/order-analysis.schema';
+import { NotificationService } from '../notifications/notifications.service';
 
 import type { AIProvider } from './ai-provider.interface';
 
@@ -21,7 +22,8 @@ export class OrderIntelligenceService {
         private readonly ordersService: OrdersService,
         private readonly orderAnalysisRepository: OrderAnalysisRepository,
         @Inject(AI_PROVIDER)
-        private readonly aiProvider: AIProvider
+        private readonly aiProvider: AIProvider,
+        private readonly notificationService: NotificationService
     ) {}
 
     async generateAnalysis(orderId: string) {
@@ -57,7 +59,7 @@ export class OrderIntelligenceService {
 
         const validated = validationResult.data;
 
-        return this.orderAnalysisRepository.create({
+        const analysis = this.orderAnalysisRepository.create({
             orderId: order.id,
             summary: validated.summary,
             priority: validated.priority as OrderAnalysisPriority,
@@ -69,6 +71,22 @@ export class OrderIntelligenceService {
             model: metadata.model,
             rawResponse: validated
         });
+
+        if(validated.priority === 'HIGH') {
+            try {
+                await this.notificationService.sendManualReviewAlert({
+                    orderId: order.id,
+                    priority: validated.priority,
+                    summary: validated.summary,
+                    riskFlags: validated.riskFlags,
+                    recommendedActions: validated.recommendedActions
+                });
+            } catch (error) {
+                console.error('Failed to send manual review alert', error);
+            }
+        }
+
+        return analysis;
     }
 
     getAnalysisForOrder(orderId: string) {

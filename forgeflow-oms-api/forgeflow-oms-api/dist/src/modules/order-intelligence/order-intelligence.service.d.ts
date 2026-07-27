@@ -1,11 +1,13 @@
 import { OrdersService } from '../orders/orders.service';
 import { OrderAnalysisRepository } from './order-analysis.repository';
+import { NotificationService } from '../notifications/notifications.service';
 import type { AIProvider } from './ai-provider.interface';
 export declare class OrderIntelligenceService {
     private readonly ordersService;
     private readonly orderAnalysisRepository;
     private readonly aiProvider;
-    constructor(ordersService: OrdersService, orderAnalysisRepository: OrderAnalysisRepository, aiProvider: AIProvider);
+    private readonly notificationService;
+    constructor(ordersService: OrdersService, orderAnalysisRepository: OrderAnalysisRepository, aiProvider: AIProvider, notificationService: NotificationService);
     generateAnalysis(orderId: string): Promise<{
         id: string;
         createdAt: Date;

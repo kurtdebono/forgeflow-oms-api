@@ -18,14 +18,17 @@ const orders_service_1 = require("../orders/orders.service");
 const ai_provider_interface_1 = require("./ai-provider.interface");
 const order_analysis_repository_1 = require("./order-analysis.repository");
 const order_analysis_schema_1 = require("./schemas/order-analysis.schema");
+const notifications_service_1 = require("../notifications/notifications.service");
 let OrderIntelligenceService = class OrderIntelligenceService {
     ordersService;
     orderAnalysisRepository;
     aiProvider;
-    constructor(ordersService, orderAnalysisRepository, aiProvider) {
+    notificationService;
+    constructor(ordersService, orderAnalysisRepository, aiProvider, notificationService) {
         this.ordersService = ordersService;
         this.orderAnalysisRepository = orderAnalysisRepository;
         this.aiProvider = aiProvider;
+        this.notificationService = notificationService;
     }
     async generateAnalysis(orderId) {
         const order = await this.ordersService.findById(orderId);
@@ -51,7 +54,7 @@ let OrderIntelligenceService = class OrderIntelligenceService {
             throw new common_1.BadGatewayException('AI Provider return an invalid order analaysis response.');
         }
         const validated = validationResult.data;
-        return this.orderAnalysisRepository.create({
+        const analysis = this.orderAnalysisRepository.create({
             orderId: order.id,
             summary: validated.summary,
             priority: validated.priority,
@@ -63,6 +66,21 @@ let OrderIntelligenceService = class OrderIntelligenceService {
             model: metadata.model,
             rawResponse: validated
         });
+        if (validated.priority === 'HIGH') {
+            try {
+                await this.notificationService.sendManualReviewAlert({
+                    orderId: order.id,
+                    priority: validated.priority,
+                    summary: validated.summary,
+                    riskFlags: validated.riskFlags,
+                    recommendedActions: validated.recommendedActions
+                });
+            }
+            catch (error) {
+                console.error('Failed to send manual review alert', error);
+            }
+        }
+        return analysis;
     }
     getAnalysisForOrder(orderId) {
         return this.orderAnalysisRepository.findByOrderId(orderId);
@@ -73,6 +91,6 @@ exports.OrderIntelligenceService = OrderIntelligenceService = __decorate([
     (0, common_1.Injectable)(),
     __param(2, (0, common_1.Inject)(ai_provider_interface_1.AI_PROVIDER)),
     __metadata("design:paramtypes", [orders_service_1.OrdersService,
-        order_analysis_repository_1.OrderAnalysisRepository, Object])
+        order_analysis_repository_1.OrderAnalysisRepository, Object, notifications_service_1.NotificationService])
 ], OrderIntelligenceService);
 //# sourceMappingURL=order-intelligence.service.js.map

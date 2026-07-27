@@ -6,9 +6,10 @@ import { OrderAnalysisRepository } from './order-analysis.repository';
 import { OrderIntelligenceController } from './order-intelligence.controller';
 import { OrderIntelligenceService } from './order-intelligence.service';
 import { OpenAIProvider } from './openai.provider';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-    imports: [OrdersModule],
+    imports: [OrdersModule, NotificationsModule],
     controllers: [OrderIntelligenceController],
     providers: [
         OrderIntelligenceService,

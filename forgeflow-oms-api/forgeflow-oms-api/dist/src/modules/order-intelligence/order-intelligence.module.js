@@ -15,12 +15,13 @@ const order_analysis_repository_1 = require("./order-analysis.repository");
 const order_intelligence_controller_1 = require("./order-intelligence.controller");
 const order_intelligence_service_1 = require("./order-intelligence.service");
 const openai_provider_1 = require("./openai.provider");
+const notifications_module_1 = require("../notifications/notifications.module");
 let OrderIntelligenceModule = class OrderIntelligenceModule {
 };
 exports.OrderIntelligenceModule = OrderIntelligenceModule;
 exports.OrderIntelligenceModule = OrderIntelligenceModule = __decorate([
     (0, common_1.Module)({
-        imports: [orders_module_1.OrdersModule],
+        imports: [orders_module_1.OrdersModule, notifications_module_1.NotificationsModule],
         controllers: [order_intelligence_controller_1.OrderIntelligenceController],
         providers: [
             order_intelligence_service_1.OrderIntelligenceService,

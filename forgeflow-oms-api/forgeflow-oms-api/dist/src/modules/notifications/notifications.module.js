@@ -12,6 +12,10 @@ const bullmq_1 = require("@nestjs/bullmq");
 const queue_constants_1 = require("../../infrastructure/queue/queue.constants");
 const order_notifications_processor_1 = require("./order-notifications.processor");
 const order_notifications_producer_1 = require("./order-notifications.producer");
+const email_provider_interface_1 = require("./email-provider.interface");
+const fake_email_provider_1 = require("./fake-email.provider");
+const resend_email_provider_1 = require("./resend-email.provider");
+const notifications_service_1 = require("./notifications.service");
 let NotificationsModule = class NotificationsModule {
 };
 exports.NotificationsModule = NotificationsModule;
@@ -24,9 +28,16 @@ exports.NotificationsModule = NotificationsModule = __decorate([
         ],
         providers: [
             order_notifications_processor_1.OrderNotificationsProcessor,
-            order_notifications_producer_1.OrderNotificationsProducer
+            order_notifications_producer_1.OrderNotificationsProducer,
+            notifications_service_1.NotificationService,
+            {
+                provide: email_provider_interface_1.EMAIL_PROVIDER,
+                useClass: process.env.EMAIL_PROVIDER === 'resend'
+                    ? resend_email_provider_1.ResendEmailProvider
+                    : fake_email_provider_1.FakeEmailProvider
+            }
         ],
-        exports: [order_notifications_producer_1.OrderNotificationsProducer]
+        exports: [order_notifications_producer_1.OrderNotificationsProducer, notifications_service_1.NotificationService]
     })
 ], NotificationsModule);
 //# sourceMappingURL=notifications.module.js.map
