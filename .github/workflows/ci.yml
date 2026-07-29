@@ -56,7 +56,15 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
+          cache-dependency-path: forgeflow-oms-dahsboard/pnpm-lock.yaml
 
+      - name: Debug pnpm config
+        run: |
+            pwd
+            pnpm --version
+            ls -la
+            cat pnpm-workspace.yaml
+            
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
