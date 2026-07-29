@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - portfolio/ai-order-intelligence
+      - portfolio/ai-dashboard-sprint
 
 jobs:
   backend:
