@@ -19,7 +19,8 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:int": "jest --runInBand --testRegex \".*\\.int-spec\\.ts$\"",
     "db:test:reset": "DATABASE_URL=\"postgresql://postgres:postgres@localhost:5432/forgeflow_oms_test?schema=public\" prisma migrate reset --force --schema src/infrastructure/database/prisma/schema.prisma",
-    "test:e2e": "jest --runInBand --testRegex \".*\\.e2e-spec\\.ts$\""
+    "test:e2e": "jest --runInBand --testRegex \".*\\.e2e-spec\\.ts$\"",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@keyv/redis": "^5.1.6",
