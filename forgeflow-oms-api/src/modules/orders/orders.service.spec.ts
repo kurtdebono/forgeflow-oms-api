@@ -166,7 +166,7 @@ describe('OrdersService', () => {
         };
 
         productServiceMock.findById.mockResolvedValue(product);
-        inventoryServiceMock.reserveStock.mockResolvedValue({ count: 1 });
+        inventoryServiceMock.reserveStock.mockResolvedValue({ count: 1 } as any);
         ordersRepositoryMock.create.mockResolvedValue(createdOrder);
 
         idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
@@ -183,7 +183,6 @@ describe('OrdersService', () => {
         idempotencyServiceMock.complete.mockResolvedValue(undefined);
 
         const createOrderDto = {
-
             items: [
                 {
                     productId,
@@ -217,8 +216,14 @@ describe('OrdersService', () => {
         expect(orderCreateData.status).toBe(OrderStatus.PENDING);
         expect(orderCreateData.totalAmount.toString()).toBe('100');
 
-        expect(orderCreateData.items.create).toHaveLength(1);
-        expect(orderCreateData.items.create[0]).toEqual(
+        const itemsCreate = orderCreateData?.items?.create;        
+
+        if(!Array.isArray(itemsCreate)) {
+            throw new Error('Expected order items to be created using an array.');
+        }
+
+        expect(itemsCreate).toHaveLength(1);
+        expect(itemsCreate[0]).toEqual(
             expect.objectContaining({
                 quantity: 2,
                 unitPrice: product.price,
@@ -396,8 +401,17 @@ describe('OrdersService', () => {
             id: orderId,
             userId: 'user-1',
             status: OrderStatus.CONFIRMED,
+            totalAmount: new Prisma.Decimal(100),
+            createdAt: new Date(),
+            updatedAt: new Date(),
             items: [],
-            user: undefined
+            user: {
+                id: 'user-1',
+                role: UserRole.ADMIN,
+                email: 'test@sample.com',
+                createdAt: new Date(),
+                updatedAt: new Date()            
+            }
         });
 
         await expect(ordersService.confirm(orderId)).rejects.toThrow(
@@ -473,7 +487,17 @@ describe('OrdersService', () => {
             id: orderId,
             userId: 'owner-user-id',
             status: OrderStatus.PENDING,
-            items: []
+            totalAmount: new Prisma.Decimal(100),
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            items: [],            
+            user: {
+                id: 'user-1',
+                email: 'test@sample.com',
+                role: UserRole.ADMIN,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
         });
 
         await expect(
@@ -543,7 +567,17 @@ describe('OrdersService', () => {
             id: orderId,
             userId: 'user-1',
             status: OrderStatus.CONFIRMED,
-            items: []
+            totalAmount: new Prisma.Decimal(100),
+            items: [],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            user: {
+                id: 'user-1',
+                email: 'test@sample.com',
+                role: UserRole.ADMIN,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
         });
 
         await expect(ordersService.confirm(orderId)).rejects.toThrow(BadRequestException);
@@ -559,7 +593,14 @@ describe('OrdersService', () => {
             totalAmount: new Prisma.Decimal(50),
             items: [],
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            user: {
+                id: 'user-1',
+                role: UserRole.ADMIN,
+                email: 'test@sample.com',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
         };
 
         idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
@@ -600,7 +641,14 @@ describe('OrdersService', () => {
             totalAmount: new Prisma.Decimal(50),
             items: [],
             createdAt: new Date(),
-            updatedAt: new Date()
+            updatedAt: new Date(),
+            user: {
+                id: 'user-1',
+                role: UserRole.ADMIN,
+                email: 'test@sample.com',
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
         };
 
         idempotencyServiceMock.createRequestHash.mockReturnValue('request-hash-1');
@@ -650,7 +698,17 @@ describe('OrdersService', () => {
             id: orderId,
             userId: 'user-1',
             status: OrderStatus.CONFIRMED,
-            items: []
+            totalAmount: new Prisma.Decimal(100),
+            items: [],
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            user: {
+                id: 'user-1',
+                email: 'test@sample.com',
+                role: UserRole.ADMIN,
+                createdAt: new Date(),
+                updatedAt: new Date()
+            }
         });
 
         await expect(ordersService.confirm(orderId)).rejects.toThrow(

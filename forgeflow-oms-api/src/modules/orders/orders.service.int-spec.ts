@@ -89,7 +89,7 @@ describe('OrdersService Integration', () => {
                     quantity: 2
                 }
             ]
-        });
+        }, 'idempotency-key-1');
 
         expect(order.status).toBe(OrderStatus.PENDING);
         expect(order.totalAmount.toString()).toBe('100');
@@ -139,7 +139,7 @@ describe('OrdersService Integration', () => {
                         quantity: 3
                     }
                 ]
-            })
+            }, 'idempotency-key-1')
         ).rejects.toThrow();
 
         const inventory = await prisma.inventory.findUniqueOrThrow({
@@ -190,7 +190,7 @@ describe('OrdersService Integration', () => {
                         quantity: 5
                     }
                 ]
-            })
+            }, 'idempotency-key-1')
         ).rejects.toThrow(BadRequestException);
 
         const inventory = await prisma.inventory.findUniqueOrThrow({
@@ -240,7 +240,7 @@ describe('OrdersService Integration', () => {
                     quantity: 3
                 }
             ]
-        });
+        }, 'idempotency-key-1');
 
         const inventoryAfterCreate = await prisma.inventory.findUniqueOrThrow({
             where: {
@@ -300,7 +300,7 @@ describe('OrdersService Integration', () => {
                     quantity: 3
                 }
             ]
-        });
+        }, 'idempotency-key-1');
 
         const inventoryAfterCreate = await prisma.inventory.findUniqueOrThrow({
             where: {
@@ -362,7 +362,7 @@ describe('OrdersService Integration', () => {
                     quantity: 2
                 }
             ]
-        });
+        }, 'idempotency-key-1');
 
         await ordersService.confirm(order.id);
 
