@@ -9,7 +9,7 @@ import { Keyv } from 'keyv';
             isGlobal: true,
             useFactory: async () => ({
                 stores: [
-                    new Keyv({
+                    await new Keyv({
                         store: new KeyvRedis(
                             process.env.REDIS_URL ?? 'redis://localhost:6379'
                         )

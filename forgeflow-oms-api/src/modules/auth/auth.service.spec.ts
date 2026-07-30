@@ -5,6 +5,7 @@ import { UserRole } from "@prisma/client";
 import * as bcrypt from 'bcrypt';
 import { AuthService } from "./auth.service";
 import { UsersService } from "../users/users.service";
+import { create } from "domain";
 
 describe('AuthService', () => {
     let authService: AuthService;
@@ -53,19 +54,21 @@ describe('AuthService', () => {
         authService = moduleRef.get(AuthService);
 
         usersServiceMock.updateRefreshTokenHash.mockImplementation(
-            async (id: string, refreshTokenHash: string | null) => {
+            (id: string, refreshTokenHash: string | null) => {
                 storedRefreshTokenHash = refreshTokenHash;
 
                 return {
                     ...baseUser,
+                    id,
                     refreshTokenHash
                 };
             }
         );
 
-        usersServiceMock.findById.mockImplementation(async (id: string) => {
+        usersServiceMock.findById.mockImplementation((id: string) => {
             return {
                 ...baseUser,
+                id,
                 refreshTokenHash: storedRefreshTokenHash
             };
         });
@@ -74,12 +77,15 @@ describe('AuthService', () => {
     it('registers a new user and returns public user data only', async () => {
         usersServiceMock.findByEmail.mockResolvedValue(null);
 
+        const createdAt = new Date(),
+            updatedAt = new Date();
+
         usersServiceMock.create.mockResolvedValue({
             id: userId,
             email: 'testemail@example.com',
             role: UserRole.CUSTOMER,
-            createdAt: new Date(),
-            updatedAt: new Date()
+            createdAt: createdAt,
+            updatedAt: updatedAt
         });
 
         const result = await authService.register({
@@ -89,20 +95,25 @@ describe('AuthService', () => {
 
         expect(usersServiceMock.findByEmail).toHaveBeenCalledWith('testemail@example.com');
 
-        expect(usersServiceMock.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                email: 'testemail@example.com',
-                passwordHash: expect.any(String)
-            })
-        );
+        const createCall = usersServiceMock.create.mock.calls[0];
+
+        if(!createCall) {
+            throw new Error('Expected usersService.create to be called.');
+        }
+
+        const createCallInput = createCall[0];
+
+        expect(createCallInput.email).toBe('testemail@example.com');
+        expect(typeof createCallInput.passwordHash).toBe('string');
+        expect(createCallInput.passwordHash.length).toBeGreaterThan(0);
 
         expect(result).toEqual(
             expect.objectContaining({
                 id: userId,
                 email: 'testemail@example.com',
                 role: UserRole.CUSTOMER,
-                createdAt: expect.any(Date),
-                updatedAt: expect.any(Date)
+                createdAt: createdAt,
+                updatedAt: updatedAt
             })
         );
 
@@ -170,12 +181,14 @@ describe('AuthService', () => {
             UnauthorizedException
         );
 
-        await expect(authService.refresh(newRefreshToken)).resolves.toEqual(
-            expect.objectContaining({
-                accessToken: expect.any(String),
-                refreshToken: expect.any(String)
-            })
-        );
+        const secondRefreshResult = await authService.refresh(newRefreshToken);
+
+        expect(typeof secondRefreshResult.accessToken).toBe('string');
+        expect(secondRefreshResult.accessToken.length).toBeGreaterThan(0);
+
+        expect(typeof secondRefreshResult.refreshToken).toBe('string');
+        expect(secondRefreshResult.refreshToken.length).toBeGreaterThan(0);
+        expect(secondRefreshResult.refreshToken).not.toEqual(newRefreshToken);
     });
 
     it('does not allow refresh after logout', async () => {
