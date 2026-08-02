@@ -62,4 +62,4 @@ dist/
 **/dist
 .next/
 out/
-node_modules/
+**/node_modules/
