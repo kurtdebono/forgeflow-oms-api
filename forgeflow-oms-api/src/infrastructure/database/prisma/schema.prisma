@@ -1,0 +1,169 @@
+generator client {
+    provider = "prisma-client-js"
+}
+
+datasource db {
+    provider = "postgresql"
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  FAILED
+}
+
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum OutboxEventStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+enum OrderAnalysisPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model User {
+  id                  String   @id @default(uuid())
+  email               String   @unique
+  passwordHash        String
+  refreshTokenHash    String?
+  role                UserRole @default(CUSTOMER)
+
+  orders              Order[]
+  idempotencyRecords IdempotencyRecord[]
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  price       Decimal  @db.Decimal(10, 2)
+  isActive    Boolean  @default(true)
+
+  inventory   Inventory?
+  orderItems  OrderItem[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Inventory {
+  id                 String  @id @default(uuid())
+  productId          String  @unique
+  availableQuantity  Int
+  reservedQuantity   Int     @default(0)
+
+  product            Product @relation(fields: [productId], references: [id])
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Order {
+  id                  String      @id @default(uuid())
+  userId              String
+  status              OrderStatus @default(PENDING)
+  totalAmount         Decimal     @db.Decimal(10, 2)
+
+  user                User        @relation(fields: [userId], references: [id])
+  items               OrderItem[]
+  idemPotenctRecords  IdempotencyRecord[]
+
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  analysis            OrderAnalysis[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  unitPrice Decimal @db.Decimal(10, 2)
+
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+model OrderAnalysis {
+  id                    String    @id @default(uuid())
+
+  orderId               String
+  order                 Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  summary               String
+  priority              OrderAnalysisPriority
+
+  riskFlags             Json
+  missingInformation    Json
+  recommendedActions    Json
+  customerExplanation   String
+
+  provider              String
+  model                 String
+  rawResponse           Json?
+
+  createdAt             DateTime    @default(now())
+
+  @@index([orderId])
+  @@index([priority])
+}
+
+model IdempotencyRecord {
+  id            String            @id @default(uuid())
+  
+  userId        String
+  operation     String
+  key           String
+  requestHash   String
+  
+  status        IdempotencyStatus @default(IN_PROGRESS)
+  
+  orderId       String?
+
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  order         Order?            @relation(fields: [orderId], references: [id])
+
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  @@unique([userId, operation, key])
+  @@index([userId])
+  @@index([orderId])
+}
+
+model OutboxEvent {
+  id            String              @id @default(uuid())
+
+  eventType     String
+  payload       Json
+
+  status        OutboxEventStatus   @default(PENDING)
+  attempts      Int                 @default(0)
+  lastError     String?
+
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  publishedAt   DateTime?
+
+  @@index([status, createdAt])
+  @@index([eventType])
+}

@@ -1,0 +1,38 @@
+import { Injectable } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
+import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
+import { publicUserSelect, authUserSelect } from './selects/user.select';
+
+@Injectable()
+export class UsersRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  create(data: Prisma.UserCreateInput) {
+    return this.prisma.user.create({
+      data,
+      select: publicUserSelect,
+    });
+  }
+
+  findById(id: string) {
+    return this.prisma.user.findUnique({
+      where: { id },
+      select: authUserSelect,
+    });
+  }
+
+  findByEmail(email: string) {
+    return this.prisma.user.findUnique({
+      where: { email },
+      select: authUserSelect,
+    });
+  }
+
+  updateRefreshTokenHash(userId: string, refreshTokenHash: string | null) {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: { refreshTokenHash },
+      select: publicUserSelect,
+    });
+  }
+}

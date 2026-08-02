@@ -1,98 +1,460 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# ForgeFlow OMS
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+ForgeFlow OMS is a full-stack order-management portfolio project built to demonstrate production-style backend architecture, clean TypeScript practices, authentication, inventory reservation, idempotent order creation, asynchronous event handling, AI-assisted order analysis, and a Next.js operations dashboard.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+The project is designed as a realistic learning and portfolio system rather than a minimal CRUD demo. It shows how a NestJS backend can handle order workflows safely while keeping deterministic business rules separate from AI-assisted recommendations.
 
-## Description
+## Project Overview
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+ForgeFlow OMS allows users to:
 
-## Project setup
+- Register and log in with JWT-based authentication.
+- Browse products publicly.
+- Create orders as authenticated customers.
+- Reserve inventory atomically when an order is created.
+- Confirm or cancel orders with role-based permissions.
+- Prevent duplicate order creation through idempotency keys.
+- Emit order-confirmed events through an outbox pattern.
+- Generate AI-assisted order intelligence for operations users.
+- Send manual-review email alerts for high-priority AI analyses.
+- Review orders and analyses through a Next.js dashboard.
 
-```bash
-$ pnpm install
+## Architecture
+
+```text
+forgeflow-oms-api/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
+├── forgeflow-oms-api/          # NestJS backend API
+└── forgeflow-oms-dashboard/    # Next.js operations dashboard
 ```
 
-## Compile and run the project
+High-level flow:
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```text
+Next.js Operations Dashboard
+        ↓
+NestJS ForgeFlow OMS API
+        ↓
+Prisma + PostgreSQL
+        ↓
+Redis / BullMQ / Outbox
+        ↓
+OpenAI + Resend
 ```
 
-## Run tests
+## Tech Stack
 
-```bash
-# unit tests
-$ pnpm run test
+### Backend
 
-# e2e tests
-$ pnpm run test:e2e
+- NestJS
+- TypeScript
+- Prisma 7
+- PostgreSQL
+- Redis
+- BullMQ
+- JWT authentication
+- bcrypt password hashing
+- Zod runtime validation
+- OpenAI integration
+- Resend email integration
+- Jest and Supertest
 
-# test coverage
-$ pnpm run test:cov
+### Frontend
+
+- Next.js
+- React
+- TypeScript
+- Client/server component split
+- Custom async hooks
+- API wrapper with JWT support
+
+### Infrastructure and Quality
+
+- GitHub Actions CI
+- pnpm
+- Prisma migrations
+- ESLint
+- TypeScript type checking
+- Unit and e2e tests
+- Strict linting with unsafe `any` checks
+
+## Core Backend Features
+
+### Authentication
+
+The API includes JWT-based authentication with access and refresh tokens.
+
+Supported flows:
+
+- Register user
+- Login user
+- Refresh token rotation
+- Logout / clear refresh token
+- Role-based authorization
+
+Roles:
+
+```ts
+CUSTOMER
+ADMIN
 ```
 
-## Deployment
+### Role-Based Access Control
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+The backend uses guards and decorators to protect routes.
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+Examples:
 
-```bash
-$ pnpm install -g @nestjs/mau
-$ mau deploy
+- Product creation requires `ADMIN`.
+- Inventory management requires `ADMIN`.
+- Order creation is available to authenticated customers and admins.
+- Order confirmation requires `ADMIN`.
+- Customers cannot confirm orders.
+
+### Product Catalogue
+
+Products can be read publicly and created by admins.
+
+Product reads use cache-aside Redis caching. Transactional flows can bypass cache and read directly from the database when required.
+
+### Inventory Reservation
+
+Inventory is reserved during order creation using an atomic database update.
+
+The reservation flow prevents overselling by checking and decrementing available stock in the same operation.
+
+Order lifecycle inventory behaviour:
+
+```text
+Create order   → decrement available quantity, increment reserved quantity
+Confirm order  → decrement reserved quantity
+Cancel order   → release reserved quantity back to available quantity
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+### Order Management
 
-## Resources
+Orders support a controlled lifecycle:
 
-Check out a few resources that may come in handy when working with NestJS:
+```text
+PENDING → CONFIRMED
+PENDING → CANCELLED
+```
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+The order stores item snapshots, including quantity and unit price, so historical order totals are preserved even if the product price changes later.
 
-## Support
+### Idempotent Order Creation
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+`POST /orders` requires an `Idempotency-Key` header.
 
-## Stay in touch
+This prevents duplicate orders if the same request is retried by the client.
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+Behaviour:
 
-## License
+```text
+Same user + same operation + same key + same body
+→ returns the original order
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+Same user + same operation + same key + different body
+→ returns 409 Conflict
+
+Missing Idempotency-Key
+→ returns 400 Bad Request
+```
+
+This is especially useful for checkout/order flows where a user might double-click, refresh, retry after a timeout, or experience a temporary network failure.
+
+### Outbox Pattern
+
+When an order is confirmed, the API creates an outbox event in the same database transaction as the order status update.
+
+This avoids the classic failure case where the database commit succeeds but queue publishing fails.
+
+Example event:
+
+```text
+ORDER_CONFIRMED
+```
+
+The outbox publisher can later process pending events and enqueue background jobs safely.
+
+### AI Order Intelligence
+
+The Order Intelligence module generates an AI-assisted analysis for an order.
+
+The AI provider receives a controlled order context, not raw database records.
+
+The response is validated with Zod before being stored.
+
+Stored analysis includes:
+
+- Summary
+- Priority: `LOW`, `MEDIUM`, `HIGH`
+- Risk flags
+- Missing information
+- Recommended actions
+- Customer-facing explanation
+- Provider metadata
+- Model metadata
+
+Important design rule:
+
+```text
+AI assists operations decisions, but deterministic business rules stay in the backend.
+```
+
+Invalid AI output is rejected before persistence.
+
+### Email Notifications
+
+When an AI analysis is marked as high priority, the system can send an internal manual-review alert.
+
+Email providers:
+
+- Fake provider for local development and CI
+- Resend provider for real email delivery
+
+The system is designed so that analysis persistence is not lost if email delivery fails.
+
+## Dashboard Features
+
+The Next.js dashboard provides an operations-facing UI for:
+
+- Logging in
+- Viewing orders
+- Viewing order details
+- Generating AI order analysis
+- Displaying analysis priority, risk flags, missing information, and recommended actions
+
+The dashboard communicates with the NestJS API using a configured API base URL.
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 22+
+- pnpm
+- Docker
+- PostgreSQL
+- Redis
+
+### Start PostgreSQL
+
+```bash
+docker run --name forgeflow-oms-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=forgeflow_oms \
+  -p 5432:5432 \
+  -d postgres:16
+```
+
+### Start Redis
+
+```bash
+docker run --name forgeflow-oms-redis \
+  -p 6379:6379 \
+  -d redis:7-alpine
+```
+
+## Backend Setup
+
+From the backend folder:
+
+```bash
+cd forgeflow-oms-api
+pnpm install
+```
+
+Create an environment file:
+
+```bash
+cp .env.example .env
+```
+
+Example backend environment values:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/forgeflow_oms?schema=public"
+
+JWT_SECRET="local-development-secret"
+JWT_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
+
+REDIS_URL="redis://localhost:6379"
+REDIS_HOST="localhost"
+REDIS_PORT="6379"
+
+AI_PROVIDER="fake"
+OPENAI_API_KEY=""
+OPENAI_MODEL="gpt-5-mini"
+OPENAI_TIMEOUT_MS="15000"
+
+EMAIL_PROVIDER="fake"
+RESEND_API_KEY=""
+RESEND_FROM_EMAIL="ForgeFlow <onboarding@resend.dev>"
+OPS_REVIEW_EMAIL="ops@example.com"
+```
+
+Generate Prisma client:
+
+```bash
+pnpm prisma generate --schema src/infrastructure/database/prisma/schema.prisma
+```
+
+Run migrations:
+
+```bash
+pnpm prisma migrate dev --schema src/infrastructure/database/prisma/schema.prisma
+```
+
+Start the backend API:
+
+```bash
+pnpm start:dev
+```
+
+Default backend URL:
+
+```text
+http://localhost:3001
+```
+
+## Dashboard Setup
+
+From the dashboard folder:
+
+```bash
+cd forgeflow-oms-dashboard
+pnpm install
+```
+
+Create `.env.local`:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
+```
+
+Start the dashboard:
+
+```bash
+pnpm dev
+```
+
+Default dashboard URL:
+
+```text
+http://localhost:3000
+```
+
+## Common Commands
+
+### Backend
+
+```bash
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm test:e2e
+pnpm build
+```
+
+### Dashboard
+
+```bash
+pnpm lint
+pnpm build
+```
+
+## Testing
+
+The backend includes unit and e2e coverage for important workflows, including:
+
+- Auth login and token behaviour
+- Role-protected product creation
+- Public product reads
+- Admin-only inventory endpoints
+- Customer order creation
+- Admin order confirmation
+- Inventory reservation and release behaviour
+- Required idempotency key validation
+- Duplicate order prevention
+- Idempotency-key conflict detection
+- Outbox event creation for confirmed orders
+
+## CI Pipeline
+
+The GitHub Actions pipeline validates the project in a clean environment.
+
+Backend CI checks:
+
+```text
+install dependencies
+Prisma generate
+Prisma migrate deploy
+typecheck
+lint
+tests
+build
+```
+
+Dashboard CI checks:
+
+```text
+install dependencies
+lint
+build
+```
+
+CI uses fake AI and email providers, so no OpenAI or Resend secrets are required for test execution.
+
+## Design Principles
+
+This project intentionally focuses on production-style patterns:
+
+- Clear module boundaries
+- Controllers for HTTP concerns
+- Services for orchestration and business rules
+- Repositories for persistence
+- Explicit DTO validation
+- Prisma payload types instead of unsafe `any`
+- Runtime validation for external AI output
+- Transaction-safe order creation
+- Idempotent write operations
+- Outbox-based asynchronous event handling
+- Role-based access control
+- CI-backed quality gates
+
+## Project Status
+
+Completed:
+
+- NestJS backend architecture
+- PostgreSQL and Prisma integration
+- Authentication and authorization
+- Product, inventory, and order workflows
+- Idempotent order creation
+- Outbox event creation
+- AI order analysis module
+- OpenAI provider integration
+- Resend notification workflow
+- Next.js dashboard core flow
+- GitHub Actions CI
+- Strict lint/typecheck cleanup
+
+Potential future improvements:
+
+- Replace direct high-priority email sending with outbox-backed notification events
+- Add pagination and filtering to order list endpoints
+- Add structured API documentation with Swagger/OpenAPI
+- Add seed scripts for demo data
+- Add dashboard deployment documentation
+- Add more detailed observability with request correlation IDs
+- Add retry and dead-letter handling for background jobs
+
+## Portfolio Summary
+
+ForgeFlow OMS demonstrates how to build a full-stack TypeScript system with realistic backend concerns such as authentication, authorization, transactions, inventory consistency, idempotency, outbox events, AI validation, email notifications, automated testing, and CI.
+
+The project is intended to show senior-level engineering judgement: keeping business rules deterministic, treating AI output as untrusted, protecting write operations from duplicate requests, and validating the system through automated quality checks.
