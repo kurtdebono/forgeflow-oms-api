@@ -62,20 +62,20 @@ describe('AuthService', () => {
       (id: string, refreshTokenHash: string | null) => {
         storedRefreshTokenHash = refreshTokenHash;
 
-        return {
+        return Promise.resolve({
           ...baseUser,
           id,
           refreshTokenHash: storedRefreshTokenHash,
-        };
+        });
       },
     );
 
     usersServiceMock.findById.mockImplementation((id: string) => {
-      return {
+      return Promise.resolve({
         ...baseUser,
         id,
         refreshTokenHash: storedRefreshTokenHash,
-      };
+      });
     });
   });
 
