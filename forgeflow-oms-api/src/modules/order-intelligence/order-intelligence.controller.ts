@@ -8,19 +8,19 @@ import { OrderIntelligenceService } from './order-intelligence.service';
 @Controller('orders/:orderId/intelligence')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OrderIntelligenceController {
-    constructor(
-        private readonly orderIntelligenceService: OrderIntelligenceService
-    ) {}
+  constructor(
+    private readonly orderIntelligenceService: OrderIntelligenceService,
+  ) {}
 
-    @Post('analysis')
-    @Roles(UserRole.ADMIN)
-    generateAnalysis(@Param('orderId') orderId: string) {
-        return this.orderIntelligenceService.generateAnalysis(orderId);
-    }
+  @Post('analysis')
+  @Roles(UserRole.ADMIN)
+  generateAnalysis(@Param('orderId') orderId: string) {
+    return this.orderIntelligenceService.generateAnalysis(orderId);
+  }
 
-    @Get('analysis')
-    @Roles(UserRole.ADMIN)
-    getAnalysis(@Param('orderId') orderId: string) {
-        return this.orderIntelligenceService.getAnalysisForOrder(orderId);
-    }
+  @Get('analysis')
+  @Roles(UserRole.ADMIN)
+  getAnalysis(@Param('orderId') orderId: string) {
+    return this.orderIntelligenceService.getAnalysisForOrder(orderId);
+  }
 }

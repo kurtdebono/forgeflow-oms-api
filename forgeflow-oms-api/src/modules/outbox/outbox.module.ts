@@ -5,8 +5,8 @@ import { OutboxPublisher } from './outbox.publisher';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-    imports: [NotificationsModule],
-    providers: [OutboxRepository, OutboxService,  OutboxPublisher],
-    exports: [OutboxService, OutboxPublisher]
+  imports: [NotificationsModule],
+  providers: [OutboxRepository, OutboxService, OutboxPublisher],
+  exports: [OutboxService, OutboxPublisher],
 })
 export class OutboxModule {}

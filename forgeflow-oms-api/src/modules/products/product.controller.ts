@@ -8,24 +8,22 @@ import { JwtAuthGuard } from '../auth/strategies/jwt-auth.guard';
 
 @Controller('products')
 export class ProductController {
-    constructor(private readonly productService: ProductService) {
-        
-    }
+  constructor(private readonly productService: ProductService) {}
 
-    @Get()
-    get() {
-        return this.productService.get();
-    }
+  @Get()
+  get() {
+    return this.productService.get();
+  }
 
-    @Get(':id')
-    findById(@Param('id') id: string) {
-        return this.productService.findById(id);
-    }
+  @Get(':id')
+  findById(@Param('id') id: string) {
+    return this.productService.findById(id);
+  }
 
-    @Post()
-    @UseGuards(JwtAuthGuard, RolesGuard)
-    @Roles(UserRole.ADMIN)    
-    create(@Body() body: CreateProductDto) {
-        return this.productService.create(body);
-    }
+  @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  create(@Body() body: CreateProductDto) {
+    return this.productService.create(body);
+  }
 }

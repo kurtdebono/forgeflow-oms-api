@@ -1,7 +1,7 @@
 import {
-    BadRequestException,
-    Injectable,
-    NotFoundException
+  BadRequestException,
+  Injectable,
+  NotFoundException,
 } from '@nestjs/common';
 import { ProductService } from '../products/product.service';
 import { CreateInventoryDto } from './dto/create-inventory.dto';
@@ -11,83 +11,86 @@ import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class InventoryService {
-    constructor(
-        private readonly inventoryRepository: InventoryRepository,
-        private readonly productService: ProductService
-    ) {
-        
+  constructor(
+    private readonly inventoryRepository: InventoryRepository,
+    private readonly productService: ProductService,
+  ) {}
+
+  async create(data: CreateInventoryDto) {
+    await this.productService.findById(data.productId);
+
+    return this.inventoryRepository.create(data);
+  }
+
+  async findByProductId(productId: string) {
+    const inventory = await this.inventoryRepository.findByProductId(productId);
+
+    if (!inventory) {
+      throw new NotFoundException(
+        `Inventory for product with id ${productId} not found`,
+      );
     }
 
-    async create(data: CreateInventoryDto) {
-        await this.productService.findById(data.productId);
+    return inventory;
+  }
 
-        return this.inventoryRepository.create(data);
+  async reserveStock(data: ReserveStockDto, tx?: Prisma.TransactionClient) {
+    const result = await this.inventoryRepository.reserveStock(
+      data.productId,
+      data.quantity,
+      tx,
+    );
+
+    if (result.count === 0) {
+      throw new BadRequestException(
+        `Not enough stock available for product with id ${data.productId}`,
+      );
     }
 
-    async findByProductId(productId: string) {
-        const inventory = await this.inventoryRepository.findByProductId(productId);
+    return this.findByProductId(data.productId);
+  }
 
-        if (!inventory) {
-            throw new NotFoundException(`Inventory for product with id ${productId} not found`);
-        }
+  async consumeReservedStock(
+    data: {
+      productId: string;
+      quantity: number;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const result = await this.inventoryRepository.consumeReservedStock(
+      data.productId,
+      data.quantity,
+      tx,
+    );
 
-        return inventory;
+    if (result.count === 0) {
+      throw new BadRequestException(
+        `Not enough reserved stock to consume for product with id ${data.productId}`,
+      );
     }
 
-    async reserveStock(
-        data: ReserveStockDto,
-        tx?: Prisma.TransactionClient
-    ) {
-        const result = await this.inventoryRepository.reserveStock(
-            data.productId,
-            data.quantity,
-            tx
-        );
+    return result;
+  }
 
-        if (result.count === 0) {
-            throw new BadRequestException(`Not enough stock available for product with id ${data.productId}`);
-        }
+  async releaseReservedStock(
+    data: {
+      productId: string;
+      quantity: number;
+    },
+    tx?: Prisma.TransactionClient,
+  ) {
+    const result = await this.inventoryRepository.releaseReservedStock(
+      data.productId,
+      data.quantity,
+      tx,
+    );
 
-        return this.findByProductId(data.productId);
+    if (result.count === 0) {
+      throw new BadRequestException(
+        `Not enough reserved stock to release for product with id ${data.productId}`,
+      );
     }
 
-    async consumeReservedStock(
-        data: {
-            productId: string;
-            quantity: number;
-        },
-        tx?: Prisma.TransactionClient
-    ) {
-        const result = await this.inventoryRepository.consumeReservedStock(
-            data.productId,
-            data.quantity,
-            tx
-        );
-
-        if (result.count === 0) {
-            throw new BadRequestException(`Not enough reserved stock to consume for product with id ${data.productId}`);
-        }
-        
-        return result;
-    }
-
-    async releaseReservedStock(
-        data: {
-            productId: string;
-            quantity: number;
-        },
-        tx?: Prisma.TransactionClient
-    ) {
-        const result = await this.inventoryRepository.releaseReservedStock(
-            data.productId,
-            data.quantity,
-            tx
-        );
-
-        if (result.count === 0) {
-            throw new BadRequestException(`Not enough reserved stock to release for product with id ${data.productId}`);
-        }
-
-        return result;
-    }
+    return result;
+  }
 }

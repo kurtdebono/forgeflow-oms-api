@@ -9,14 +9,9 @@ import { IdempotencyModule } from '../idempotency/idempotency.module';
 import { OutboxModule } from '../outbox/outbox.module';
 
 @Module({
-    imports: [
-        ProductModule,
-        InventoryModule,
-        IdempotencyModule,
-        OutboxModule
-    ],
-    controllers: [OrdersController],
-    providers: [OrdersService, OrdersRepository],
-    exports: [OrdersService]
+  imports: [ProductModule, InventoryModule, IdempotencyModule, OutboxModule],
+  controllers: [OrdersController],
+  providers: [OrdersService, OrdersRepository],
+  exports: [OrdersService],
 })
 export class OrdersModule {}

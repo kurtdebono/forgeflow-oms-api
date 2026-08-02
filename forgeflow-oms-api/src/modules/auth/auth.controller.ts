@@ -6,36 +6,36 @@ import { RefreshTokenDto } from './dto/refresh-token.dto';
 import { JwtAuthGuard } from './strategies/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 
+import type { AuthenticatedUser } from './decorators/current-user.decorator';
+
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) {
+  constructor(private readonly authService: AuthService) {}
 
-    }
+  @Post('register')
+  register(@Body() body: RegisterDto) {
+    return this.authService.register(body);
+  }
 
-    @Post('register')
-    register(@Body() body: RegisterDto) {
-        return this.authService.register(body);
-    }
-    
-    @Post('login')
-    login(@Body() body: LoginDto) {
-        return this.authService.login(body);
-    }
+  @Post('login')
+  login(@Body() body: LoginDto) {
+    return this.authService.login(body);
+  }
 
-    @UseGuards(JwtAuthGuard)
-    @Post('logout')
-    logout(@CurrentUser() user: CurrentUser) {
-        return this.authService.logout(user.userId);
-    }
+  @UseGuards(JwtAuthGuard)
+  @Post('logout')
+  logout(@CurrentUser() user: AuthenticatedUser) {
+    return this.authService.logout(user.userId);
+  }
 
-    @Post('refresh')
-    refresh(@Body() body: RefreshTokenDto) {
-        return this.authService.refresh(body.refreshToken);
-    }
+  @Post('refresh')
+  refresh(@Body() body: RefreshTokenDto) {
+    return this.authService.refresh(body.refreshToken);
+  }
 
-    @UseGuards(JwtAuthGuard)
-    @Get('me')
-    me(@CurrentUser() user: CurrentUser) {
-        return user;
-    }
+  @UseGuards(JwtAuthGuard)
+  @Get('me')
+  me(@CurrentUser() user: AuthenticatedUser) {
+    return user;
+  }
 }

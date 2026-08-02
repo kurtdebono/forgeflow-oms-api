@@ -4,20 +4,19 @@ import KeyvRedis from '@keyv/redis';
 import { Keyv } from 'keyv';
 
 @Module({
-    imports: [
-        CacheModule.registerAsync({
-            isGlobal: true,
-            useFactory: async () => ({
-                stores: [
-                    await new Keyv({
-                        store: new KeyvRedis(
-                            process.env.REDIS_URL ?? 'redis://localhost:6379'
-                        )
-                    })
-                ]
-            })
-        })
-    ]
+  imports: [
+    CacheModule.registerAsync({
+      isGlobal: true,
+      useFactory: () => ({
+        stores: [
+          new Keyv({
+            store: new KeyvRedis(
+              process.env.REDIS_URL ?? 'redis://localhost:6379',
+            ),
+          }),
+        ],
+      }),
+    }),
+  ],
 })
-
 export class AppCacheModule {}

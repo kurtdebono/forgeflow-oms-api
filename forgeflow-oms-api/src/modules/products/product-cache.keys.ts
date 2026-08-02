@@ -1,7 +1,7 @@
 export const ProductCacheKeys = {
-    all: 'products:all',
+  all: 'products:all',
 
-    byId(productId: string) {
-        return `products:${productId}`;
-    }
-}
+  byId(productId: string) {
+    return `products:${productId}`;
+  },
+};

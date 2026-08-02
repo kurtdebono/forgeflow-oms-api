@@ -9,18 +9,16 @@ import { OpenAIProvider } from './openai.provider';
 import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
-    imports: [OrdersModule, NotificationsModule],
-    controllers: [OrderIntelligenceController],
-    providers: [
-        OrderIntelligenceService,
-        OrderAnalysisRepository,
-        {
-            provide: AI_PROVIDER,
-            useClass: 
-                process.env.AI_PROVIDER === 'openai'
-                    ? OpenAIProvider
-                    : FakeAIProvider
-        }
-    ]
+  imports: [OrdersModule, NotificationsModule],
+  controllers: [OrderIntelligenceController],
+  providers: [
+    OrderIntelligenceService,
+    OrderAnalysisRepository,
+    {
+      provide: AI_PROVIDER,
+      useClass:
+        process.env.AI_PROVIDER === 'openai' ? OpenAIProvider : FakeAIProvider,
+    },
+  ],
 })
 export class OrderIntelligenceModule {}
