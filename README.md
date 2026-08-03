@@ -1,7 +1,7 @@
 # ForgeFlow OMS
 ![CI](https://github.com/kurtdebono/forgeflow-oms-api/actions/workflows/ci.yml/badge.svg)
 
-ForgeFlow OMS is a full-stack order-management portfolio project built with NestJS, Next.js, Prisma, PostgreSQL and TypeScript.
+ForgeFlow OMS is an architecture-focused full-stack order-management portfolio project built with NestJS, Next.js, Prisma, PostgreSQL and TypeScript. It is not intended to be a production SaaS product; instead, it demonstrates production-aware backend and full-stack engineering patterns in a realistic order-management workflow.
 
 The project demonstrates production-style backend engineering rather than a simple CRUD flow. It includes authentication, role-based access control, inventory reservation, idempotent order creation, outbox-style event handling, AI-assisted order analysis, email-notification abstraction, automated tests and GitHub Actions CI.
 
