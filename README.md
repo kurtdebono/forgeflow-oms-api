@@ -1,47 +1,128 @@
 # ForgeFlow OMS
 
-ForgeFlow OMS is a full-stack order-management portfolio project built to demonstrate production-style backend architecture, clean TypeScript practices, authentication, inventory reservation, idempotent order creation, asynchronous event handling, AI-assisted order analysis, and a Next.js operations dashboard.
+ForgeFlow OMS is a full-stack order-management portfolio project built with NestJS, Next.js, Prisma, PostgreSQL and TypeScript.
 
-The project is designed as a realistic learning and portfolio system rather than a minimal CRUD demo. It shows how a NestJS backend can handle order workflows safely while keeping deterministic business rules separate from AI-assisted recommendations.
+The project demonstrates production-style backend engineering rather than a simple CRUD flow. It includes authentication, role-based access control, inventory reservation, idempotent order creation, outbox-style event handling, AI-assisted order analysis, email-notification abstraction, automated tests and GitHub Actions CI.
 
-## Project Overview
+## What This Project Demonstrates
 
-ForgeFlow OMS allows users to:
+ForgeFlow OMS is designed to show practical engineering judgement across a realistic order workflow:
 
-- Register and log in with JWT-based authentication.
-- Browse products publicly.
-- Create orders as authenticated customers.
-- Reserve inventory atomically when an order is created.
-- Confirm or cancel orders with role-based permissions.
-- Prevent duplicate order creation through idempotency keys.
-- Emit order-confirmed events through an outbox pattern.
-- Generate AI-assisted order intelligence for operations users.
-- Send manual-review email alerts for high-priority AI analyses.
-- Review orders and analyses through a Next.js dashboard.
+- Safe write operations using idempotency keys.
+- Atomic inventory reservation to avoid overselling.
+- Clear separation between HTTP, service, persistence and infrastructure layers.
+- Runtime validation of external AI output before persistence.
+- Deterministic business rules kept separate from AI-assisted recommendations.
+- Provider abstractions for OpenAI and email delivery.
+- Unit/e2e testing and CI-backed quality gates.
+- A Next.js dashboard for operations-style workflows.
 
 ## Architecture
 
+ForgeFlow is structured as a full-stack order-management system with a NestJS backend, a Next.js operations dashboard, PostgreSQL persistence, Redis-backed infrastructure, and pluggable external providers for AI and email.
+
+```mermaid
+flowchart LR
+        User[Operations User / Admin] --> Dashboard[Next.js Dashboard]
+
+        Dashboard -->|HTTP / JSON| Api[NestJS API]
+
+        Api --> Auth[Auth & RBAC]
+        Api --> Orders[Orders Module]
+        Api --> Products[Products Module]
+        Api --> Inventory[Inventory Module]
+        Api --> Intelligence[Order Intelligence Module]
+
+        Orders --> Idempotency[Idempotency Module]
+        Orders --> Outbox[Outbox Module]
+        Orders --> Database[(PostgreSQL / Prisma)]
+
+        Products --> Cache[(Redis Cache)]
+        Products --> Database
+
+        Inventory --> Database
+        Idempotency --> Database
+        Intelligence --> Database
+
+        Intelligence -->|Structured prompt| AIProvider[AI Provider]
+        AIProvider --> FakeAI[Fake Provider]
+        AIProvider --> OpenAI[OpenAI Provider]
+
+        Intelligence --> Notifications[Notifications Module]
+        Notifications --> EmailProvider[Email Provider]
+        EmailProvider --> FakeEmail[Fake Provider]
+        EmailProvider --> Resend[Resend Provider]
+
+        Outbox --> Queue[Redis / BullMQ]
+        Queue --> Worker[Background Worker]
+```
+
+## AI Order Intelligence Flow
+
+```mermaid
+sequenceDiagram
+        participant User as Operations User
+        participant Dashboard as Next.js Dashboard
+        participant API as NestJS API
+        participant Orders as Orders Service
+        participant AI as AI Provider
+        participant Zod as Zod Validation
+        participant DB as PostgreSQL
+        participant Email as Notification Provider
+
+        User->>Dashboard: Generate order analysis
+        Dashboard->>API: POST /order-intelligence/:orderId/analyze
+        API->>Orders: Load order details
+        Orders-->>API: Order with items and customer context
+
+        API->>AI: Send controlled order context
+        AI-->>API: Structured analysis response
+        
+        API->>Zod: Validate AI response schema
+
+        alt Valid response
+                Zod-->>API: Parsed analysis
+                API->>DB: Store order analysis
+
+                alt High priority
+                        API->>Email: Send manual review alert
+                end
+
+                API-->>Dashboard: Analysis resultperfe
+        else Invalid response
+                Zod-->>API: Validation failure
+                API-->>Dashboard: Bad Gateway response
+        end
+```
+
+The backend keeps core business behaviour deterministic. AI is used to assist operations users by generating order analysis, but order state transitions, inventory changes and authorization rules remain controlled by application logic.
+
+## Dashboard Preview
+
+The Next.js dashboard providers an operations-facing interface for reviewing operations-facing interface for reviewing orders and generating AI-assisted order analysis.
+
+### Orders List
+
+![Orders list](docs/images/orders-list.png)
+
+### Order Details
+
+![Orders details](docs/images/order-detail.png)
+
+### AI Order Analysis
+
+![AI order analysis](docs/images/order-analysis.png)
+
+## Repository Structure
+
 ```text
-forgeflow-oms-api/
+.
 ├── .github/
 │   └── workflows/
 │       └── ci.yml
 ├── forgeflow-oms-api/          # NestJS backend API
-└── forgeflow-oms-dashboard/    # Next.js operations dashboard
-```
-
-High-level flow:
-
-```text
-Next.js Operations Dashboard
-        ↓
-NestJS ForgeFlow OMS API
-        ↓
-Prisma + PostgreSQL
-        ↓
-Redis / BullMQ / Outbox
-        ↓
-OpenAI + Resend
+├── forgeflow-oms-dashboard/    # Next.js operations dashboard
+└── README.md
 ```
 
 ## Tech Stack
@@ -57,8 +138,8 @@ OpenAI + Resend
 - JWT authentication
 - bcrypt password hashing
 - Zod runtime validation
-- OpenAI integration
-- Resend email integration
+- OpenAI provider integration
+- Resend email provider integration
 - Jest and Supertest
 
 ### Frontend
@@ -66,89 +147,74 @@ OpenAI + Resend
 - Next.js
 - React
 - TypeScript
-- Client/server component split
 - Custom async hooks
-- API wrapper with JWT support
+- JWT-aware API client
+- Operations dashboard UI
 
-### Infrastructure and Quality
+### Quality and Tooling
 
-- GitHub Actions CI
 - pnpm
-- Prisma migrations
 - ESLint
 - TypeScript type checking
-- Unit and e2e tests
-- Strict linting with unsafe `any` checks
+- Prisma migrations
+- Unit tests
+- E2E tests
+- GitHub Actions CI
+- Strict linting around unsafe `any` usage
 
-## Core Backend Features
+## Core Features
 
-### Authentication
+### Authentication and Authorization
 
-The API includes JWT-based authentication with access and refresh tokens.
+The API supports JWT-based authentication with access and refresh tokens. Protected routes use role-based access control.
 
-Supported flows:
+Supported roles:
 
-- Register user
-- Login user
-- Refresh token rotation
-- Logout / clear refresh token
-- Role-based authorization
-
-Roles:
-
-```ts
+```text
 CUSTOMER
 ADMIN
 ```
 
-### Role-Based Access Control
-
-The backend uses guards and decorators to protect routes.
-
 Examples:
 
-- Product creation requires `ADMIN`.
-- Inventory management requires `ADMIN`.
-- Order creation is available to authenticated customers and admins.
-- Order confirmation requires `ADMIN`.
+- Public users can read products.
+- Admins can create products and manage inventory.
+- Customers can create orders.
+- Admins can confirm orders.
 - Customers cannot confirm orders.
 
 ### Product Catalogue
 
-Products can be read publicly and created by admins.
-
-Product reads use cache-aside Redis caching. Transactional flows can bypass cache and read directly from the database when required.
+Products can be read publicly and created by admins. Product reads use a cache-aside approach with Redis, while transactional order flows can bypass cache and read directly from the database.
 
 ### Inventory Reservation
 
-Inventory is reserved during order creation using an atomic database update.
-
-The reservation flow prevents overselling by checking and decrementing available stock in the same operation.
-
-Order lifecycle inventory behaviour:
+Inventory is reserved when an order is created. The reservation uses an atomic database update so that stock availability is checked and updated safely.
 
 ```text
-Create order   → decrement available quantity, increment reserved quantity
-Confirm order  → decrement reserved quantity
+Create order   → decrease available quantity, increase reserved quantity
+Confirm order  → consume reserved quantity
 Cancel order   → release reserved quantity back to available quantity
 ```
 
-### Order Management
+This protects the order workflow from overselling in concurrent scenarios.
 
-Orders support a controlled lifecycle:
+### Order Lifecycle
+
+Orders follow a controlled lifecycle:
 
 ```text
 PENDING → CONFIRMED
 PENDING → CANCELLED
 ```
 
-The order stores item snapshots, including quantity and unit price, so historical order totals are preserved even if the product price changes later.
+Order items store snapshot values such as quantity and unit price, so historical orders remain consistent even if product data changes later.
 
 ### Idempotent Order Creation
 
 `POST /orders` requires an `Idempotency-Key` header.
 
-This prevents duplicate orders if the same request is retried by the client.
+This prevents duplicate orders when a client retries the same request due to refreshes, double-clicks, timeouts or network issues.
 
 Behaviour:
 
@@ -163,13 +229,11 @@ Missing Idempotency-Key
 → returns 400 Bad Request
 ```
 
-This is especially useful for checkout/order flows where a user might double-click, refresh, retry after a timeout, or experience a temporary network failure.
+### Outbox Event Handling
 
-### Outbox Pattern
+When an order is confirmed, the backend creates an outbox event in the same database transaction as the order update.
 
-When an order is confirmed, the API creates an outbox event in the same database transaction as the order status update.
-
-This avoids the classic failure case where the database commit succeeds but queue publishing fails.
+This avoids a common reliability issue where a database transaction succeeds but queue publishing fails afterward.
 
 Example event:
 
@@ -183,9 +247,7 @@ The outbox publisher can later process pending events and enqueue background job
 
 The Order Intelligence module generates an AI-assisted analysis for an order.
 
-The AI provider receives a controlled order context, not raw database records.
-
-The response is validated with Zod before being stored.
+The AI provider receives a controlled order context instead of raw database records. The AI response is then validated with Zod before being stored.
 
 Stored analysis includes:
 
@@ -198,36 +260,34 @@ Stored analysis includes:
 - Provider metadata
 - Model metadata
 
-Important design rule:
+Important design decision:
 
 ```text
-AI assists operations decisions, but deterministic business rules stay in the backend.
+AI output is treated as untrusted until validated.
 ```
 
 Invalid AI output is rejected before persistence.
 
-### Email Notifications
+### Email Notification Workflow
 
 When an AI analysis is marked as high priority, the system can send an internal manual-review alert.
 
-Email providers:
+Supported email providers:
 
-- Fake provider for local development and CI
-- Resend provider for real email delivery
+- Fake provider for local development and CI.
+- Resend provider for real email delivery.
 
-The system is designed so that analysis persistence is not lost if email delivery fails.
+The system is designed so that a failed email notification does not remove or roll back a successfully stored AI analysis.
 
-## Dashboard Features
+### Operations Dashboard
 
 The Next.js dashboard provides an operations-facing UI for:
 
-- Logging in
-- Viewing orders
-- Viewing order details
-- Generating AI order analysis
-- Displaying analysis priority, risk flags, missing information, and recommended actions
-
-The dashboard communicates with the NestJS API using a configured API base URL.
+- Logging in.
+- Viewing orders.
+- Viewing order details.
+- Generating AI order analysis.
+- Reviewing AI priority, risk flags, missing information and recommended actions.
 
 ## Local Development
 
@@ -265,45 +325,16 @@ From the backend folder:
 ```bash
 cd forgeflow-oms-api
 pnpm install
-```
-
-Create an environment file:
-
-```bash
 cp .env.example .env
 ```
 
-Example backend environment values:
-
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/forgeflow_oms?schema=public"
-
-JWT_SECRET="local-development-secret"
-JWT_EXPIRES_IN="15m"
-JWT_REFRESH_EXPIRES_IN="7d"
-
-REDIS_URL="redis://localhost:6379"
-REDIS_HOST="localhost"
-REDIS_PORT="6379"
-
-AI_PROVIDER="fake"
-OPENAI_API_KEY=""
-OPENAI_MODEL="gpt-5-mini"
-OPENAI_TIMEOUT_MS="15000"
-
-EMAIL_PROVIDER="fake"
-RESEND_API_KEY=""
-RESEND_FROM_EMAIL="ForgeFlow <onboarding@resend.dev>"
-OPS_REVIEW_EMAIL="ops@example.com"
-```
-
-Generate Prisma client:
+Generate the Prisma client:
 
 ```bash
 pnpm prisma generate --schema src/infrastructure/database/prisma/schema.prisma
 ```
 
-Run migrations:
+Run database migrations:
 
 ```bash
 pnpm prisma migrate dev --schema src/infrastructure/database/prisma/schema.prisma
@@ -321,6 +352,32 @@ Default backend URL:
 http://localhost:3001
 ```
 
+### Backend Environment Variables
+
+Example values are provided in `.env.example`.
+
+```env
+PORT=3001
+NODE_ENV=development
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/forgeflow_oms?schema=public"
+REDIS_URL="redis://localhost:6379"
+REDIS_HOST="localhost"
+REDIS_PORT=6379
+JWT_SECRET="replace-with-a-secure-secret"
+JWT_EXPIRES_IN="15m"
+JWT_REFRESH_EXPIRES_IN="7d"
+AI_PROVIDER="fake"
+OPENAI_API_KEY=""
+OPENAI_MODEL="gpt-5-mini"
+OPENAI_TIMEOUT_MS=15000
+EMAIL_PROVIDER="fake"
+RESEND_API_KEY=""
+RESEND_FROM_EMAIL="ForgeFlow <onboarding@resend.dev>"
+OPS_REVIEW_EMAIL="ops@example.com"
+```
+
+For local development and CI, `AI_PROVIDER=fake` and `EMAIL_PROVIDER=fake` allow the system to run without OpenAI or Resend secrets.
+
 ## Dashboard Setup
 
 From the dashboard folder:
@@ -328,18 +385,14 @@ From the dashboard folder:
 ```bash
 cd forgeflow-oms-dashboard
 pnpm install
+cp .env.local.example .env.local
+pnpm dev
 ```
 
-Create `.env.local`:
+Dashboard environment:
 
 ```env
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3001
-```
-
-Start the dashboard:
-
-```bash
-pnpm dev
+NEXT_PUBLIC_API_BASE_URL="http://localhost:3001"
 ```
 
 Default dashboard URL:
@@ -348,11 +401,12 @@ Default dashboard URL:
 http://localhost:3000
 ```
 
-## Common Commands
+## Testing and Quality Checks
 
 ### Backend
 
 ```bash
+cd forgeflow-oms-api
 pnpm typecheck
 pnpm lint
 pnpm test
@@ -363,29 +417,14 @@ pnpm build
 ### Dashboard
 
 ```bash
+cd forgeflow-oms-dashboard
 pnpm lint
 pnpm build
 ```
 
-## Testing
-
-The backend includes unit and e2e coverage for important workflows, including:
-
-- Auth login and token behaviour
-- Role-protected product creation
-- Public product reads
-- Admin-only inventory endpoints
-- Customer order creation
-- Admin order confirmation
-- Inventory reservation and release behaviour
-- Required idempotency key validation
-- Duplicate order prevention
-- Idempotency-key conflict detection
-- Outbox event creation for confirmed orders
-
 ## CI Pipeline
 
-The GitHub Actions pipeline validates the project in a clean environment.
+The GitHub Actions workflow validates the project in a clean environment.
 
 Backend CI checks:
 
@@ -407,54 +446,76 @@ lint
 build
 ```
 
-CI uses fake AI and email providers, so no OpenAI or Resend secrets are required for test execution.
+CI uses fake AI and email providers, so no OpenAI or Resend secrets are required for automated checks.
 
-## Design Principles
+## E2E Coverage
 
-This project intentionally focuses on production-style patterns:
+The e2e test suite covers important workflows, including:
 
-- Clear module boundaries
-- Controllers for HTTP concerns
-- Services for orchestration and business rules
-- Repositories for persistence
-- Explicit DTO validation
-- Prisma payload types instead of unsafe `any`
-- Runtime validation for external AI output
-- Transaction-safe order creation
-- Idempotent write operations
-- Outbox-based asynchronous event handling
-- Role-based access control
-- CI-backed quality gates
+- Authentication and login behaviour.
+- Role-protected product creation.
+- Public product reads.
+- Admin-only inventory endpoints.
+- Customer order creation.
+- Admin order confirmation.
+- Inventory reservation behaviour.
+- Required idempotency key validation.
+- Duplicate order prevention.
+- Idempotency key conflict detection.
+- Outbox event creation for confirmed orders.
+
+## Design Decisions
+
+### AI is advisory, not authoritative
+
+The AI module supports operations users, but it does not control order state transitions or inventory updates. Business-critical behaviour remains deterministic and testable.
+
+### External output is validated at runtime
+
+OpenAI output is treated as untrusted data. The response is validated with Zod before persistence.
+
+### Write operations are protected from duplicate requests
+
+Order creation uses idempotency records so that retries do not create duplicate orders or reserve inventory multiple times.
+
+### Events are created transactionally
+
+Order confirmation creates an outbox event inside the same database transaction as the order status update.
+
+### Providers are abstracted
+
+AI and email integrations are behind provider interfaces. This allows local development and CI to use fake providers while production-like environments can use OpenAI and Resend.
 
 ## Project Status
 
 Completed:
 
-- NestJS backend architecture
-- PostgreSQL and Prisma integration
-- Authentication and authorization
-- Product, inventory, and order workflows
-- Idempotent order creation
-- Outbox event creation
-- AI order analysis module
-- OpenAI provider integration
-- Resend notification workflow
-- Next.js dashboard core flow
-- GitHub Actions CI
-- Strict lint/typecheck cleanup
+- NestJS backend architecture.
+- PostgreSQL and Prisma integration.
+- JWT authentication and refresh token flow.
+- Role-based authorization.
+- Product, inventory and order workflows.
+- Atomic inventory reservation.
+- Idempotent order creation.
+- Outbox event creation.
+- AI order analysis module.
+- OpenAI provider integration.
+- Resend notification workflow.
+- Next.js dashboard core flow.
+- Unit and e2e test coverage.
+- GitHub Actions CI.
+- Strict TypeScript and ESLint cleanup.
 
-Potential future improvements:
+Future improvements:
 
-- Replace direct high-priority email sending with outbox-backed notification events
-- Add pagination and filtering to order list endpoints
-- Add structured API documentation with Swagger/OpenAPI
-- Add seed scripts for demo data
-- Add dashboard deployment documentation
-- Add more detailed observability with request correlation IDs
-- Add retry and dead-letter handling for background jobs
+- Docker Compose and seed data for repeatable local demos
+- Swagger/OpenAPI documentation for easier API exploration
+- Pagination and filtering for order-management workflows
+- Correlation IDs and structured request logging
+- Full outbox-backed notification delivery with retries and dead-letter handling
 
 ## Portfolio Summary
 
-ForgeFlow OMS demonstrates how to build a full-stack TypeScript system with realistic backend concerns such as authentication, authorization, transactions, inventory consistency, idempotency, outbox events, AI validation, email notifications, automated testing, and CI.
+ForgeFlow OMS demonstrates how to build a full-stack TypeScript system with realistic backend concerns: authentication, authorization, transactions, inventory consistency, idempotency, outbox events, AI validation, email notifications, automated testing and CI.
 
-The project is intended to show senior-level engineering judgement: keeping business rules deterministic, treating AI output as untrusted, protecting write operations from duplicate requests, and validating the system through automated quality checks.
+The project is intentionally designed to show senior engineering judgement: protecting critical write operations, validating untrusted external output, separating business logic from infrastructure concerns, and backing the system with automated quality checks.
