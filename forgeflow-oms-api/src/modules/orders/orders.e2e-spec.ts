@@ -64,8 +64,11 @@ describe('Auth / Products / Orders e2e', () => {
     await app.close();
   });
 
+  let userSequence = 0;
+
   async function createUserAndLogin(role: UserRole) {
-    const email = `${role.toLowerCase()}-${Date.now()}@example.com`;
+    userSequence += 1;
+    const email = `${role.toLowerCase()}-${userSequence}@example.com`;
     const password = 'Password123!';
 
     const user = await prisma.user.create({
@@ -465,5 +468,203 @@ describe('Auth / Products / Orders e2e', () => {
 
     expect(inventory.availableQuantity).toBe(9);
     expect(inventory.reservedQuantity).toBe(1);
+  });
+
+  describe('order read access control', () => {
+    const credentialFields = /passwordHash|refreshTokenHash/;
+    const publicUserKeys = ['createdAt', 'email', 'id', 'role', 'updatedAt'];
+
+    async function createOrderFor(userId: string) {
+      const product = await prisma.product.create({
+        data: {
+          name: 'Lamp',
+          description: 'Desk lamp',
+          price: new Prisma.Decimal(30),
+          isActive: true,
+        },
+      });
+
+      return prisma.order.create({
+        data: {
+          userId,
+          status: OrderStatus.PENDING,
+          totalAmount: new Prisma.Decimal(30),
+          items: {
+            create: {
+              productId: product.id,
+              quantity: 1,
+              unitPrice: new Prisma.Decimal(30),
+            },
+          },
+        },
+      });
+    }
+
+    function expectNoCredentialFields(response: request.Response) {
+      expect(response.text).not.toMatch(credentialFields);
+    }
+
+    it('returns only public user fields from GET /orders (AC1)', async () => {
+      const customer = await createUserAndLogin(UserRole.CUSTOMER);
+      const admin = await createUserAndLogin(UserRole.ADMIN);
+      await createOrderFor(customer.id);
+
+      const response = await request(httpServer)
+        .get('/orders')
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      const orders = response.body as OrderWithDetails[];
+
+      expect(orders).toHaveLength(1);
+      for (const order of orders) {
+        expect(Object.keys(order.user).sort()).toEqual(publicUserKeys);
+      }
+      expectNoCredentialFields(response);
+    });
+
+    it('lets a customer read their own order (AC2)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const order = await createOrderFor(owner.id);
+
+      const response = await request(httpServer)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(200);
+
+      const body = response.body as OrderWithDetails;
+
+      expect(body.id).toBe(order.id);
+      expect(Object.keys(body.user).sort()).toEqual(publicUserKeys);
+      expectNoCredentialFields(response);
+    });
+
+    it('forbids a customer from reading another user`s order (AC3)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const otherCustomer = await createUserAndLogin(UserRole.CUSTOMER);
+      const order = await createOrderFor(owner.id);
+
+      const response = await request(httpServer)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${otherCustomer.accessToken}`)
+        .expect(403);
+
+      expect(response.text).not.toContain(owner.email);
+      expect(response.body).not.toHaveProperty('items');
+    });
+
+    it('lets an admin read any user`s order (AC4)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const admin = await createUserAndLogin(UserRole.ADMIN);
+      const order = await createOrderFor(owner.id);
+
+      const response = await request(httpServer)
+        .get(`/orders/${order.id}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      const body = response.body as OrderWithDetails;
+
+      expect(body.id).toBe(order.id);
+      expect(body.user.email).toBe(owner.email);
+      expectNoCredentialFields(response);
+    });
+
+    it('returns 404 for a missing order to any role (AC5)', async () => {
+      const customer = await createUserAndLogin(UserRole.CUSTOMER);
+      const admin = await createUserAndLogin(UserRole.ADMIN);
+      const missingOrderId = '00000000-0000-4000-8000-000000000000';
+
+      for (const user of [customer, admin]) {
+        await request(httpServer)
+          .get(`/orders/${missingOrderId}`)
+          .set('Authorization', `Bearer ${user.accessToken}`)
+          .expect(404);
+      }
+    });
+
+    it('lets a customer list their own orders by user id (AC6)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const otherCustomer = await createUserAndLogin(UserRole.CUSTOMER);
+      const ownOrder = await createOrderFor(owner.id);
+      await createOrderFor(otherCustomer.id);
+
+      const response = await request(httpServer)
+        .get(`/orders/user/${owner.id}`)
+        .set('Authorization', `Bearer ${owner.accessToken}`)
+        .expect(200);
+
+      const orders = response.body as OrderWithDetails[];
+
+      expect(orders.map((order) => order.id)).toEqual([ownOrder.id]);
+      expectNoCredentialFields(response);
+    });
+
+    it('forbids a customer from listing another user`s orders, existing or not (AC7)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const otherCustomer = await createUserAndLogin(UserRole.CUSTOMER);
+      await createOrderFor(owner.id);
+      const missingUserId = '00000000-0000-4000-8000-000000000000';
+
+      for (const userId of [owner.id, missingUserId]) {
+        await request(httpServer)
+          .get(`/orders/user/${userId}`)
+          .set('Authorization', `Bearer ${otherCustomer.accessToken}`)
+          .expect(403);
+      }
+    });
+
+    it('lets an admin list any user`s orders (AC8)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const admin = await createUserAndLogin(UserRole.ADMIN);
+      const order = await createOrderFor(owner.id);
+
+      const response = await request(httpServer)
+        .get(`/orders/user/${owner.id}`)
+        .set('Authorization', `Bearer ${admin.accessToken}`)
+        .expect(200);
+
+      const orders = response.body as OrderWithDetails[];
+
+      expect(orders.map((o) => o.id)).toEqual([order.id]);
+      expectNoCredentialFields(response);
+    });
+
+    it('requires a valid JWT for both read endpoints (AC9)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const order = await createOrderFor(owner.id);
+
+      for (const path of [`/orders/${order.id}`, `/orders/user/${owner.id}`]) {
+        await request(httpServer).get(path).expect(401);
+
+        await request(httpServer)
+          .get(path)
+          .set('Authorization', 'Bearer not-a-valid-token')
+          .expect(401);
+      }
+    });
+
+    it('never returns credential fields from any order read endpoint (R4)', async () => {
+      const owner = await createUserAndLogin(UserRole.CUSTOMER);
+      const admin = await createUserAndLogin(UserRole.ADMIN);
+      const order = await createOrderFor(owner.id);
+
+      const reads = [
+        { path: '/orders', token: admin.accessToken },
+        { path: '/orders/my', token: owner.accessToken },
+        { path: `/orders/${order.id}`, token: owner.accessToken },
+        { path: `/orders/user/${owner.id}`, token: owner.accessToken },
+      ];
+
+      for (const { path, token } of reads) {
+        const response = await request(httpServer)
+          .get(path)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+
+        expect(response.text).toContain(owner.email);
+        expectNoCredentialFields(response);
+      }
+    });
   });
 });

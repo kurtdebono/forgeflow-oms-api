@@ -821,4 +821,113 @@ describe('OrdersService', () => {
 
     expect(outboxServiceMock.createEvent).not.toHaveBeenCalled();
   });
+
+  describe('read access control', () => {
+    const ownerId = 'owner-user-id';
+    const otherCustomerId = 'other-customer-id';
+    const adminId = 'admin-user-id';
+
+    const ownedOrder = {
+      id: 'order-1',
+      userId: ownerId,
+      status: OrderStatus.PENDING,
+      totalAmount: new Prisma.Decimal(100),
+      items: [],
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+      user: {
+        id: ownerId,
+        email: 'owner@sample.com',
+        role: UserRole.CUSTOMER,
+        createdAt: new Date('2026-01-01T00:00:00Z'),
+        updatedAt: new Date('2026-01-01T00:00:00Z'),
+      },
+    } satisfies OrderWithDetails;
+
+    describe('findByIdForActor', () => {
+      it('returns the order to the customer who owns it', async () => {
+        ordersRepositoryMock.findById.mockResolvedValue(ownedOrder);
+
+        const result = await ordersService.findByIdForActor(ownedOrder.id, {
+          userId: ownerId,
+          role: UserRole.CUSTOMER,
+        });
+
+        expect(result).toBe(ownedOrder);
+      });
+
+      it('forbids a customer from reading another user`s order', async () => {
+        ordersRepositoryMock.findById.mockResolvedValue(ownedOrder);
+
+        await expect(
+          ordersService.findByIdForActor(ownedOrder.id, {
+            userId: otherCustomerId,
+            role: UserRole.CUSTOMER,
+          }),
+        ).rejects.toThrow(ForbiddenException);
+      });
+
+      it('returns any user`s order to an admin', async () => {
+        ordersRepositoryMock.findById.mockResolvedValue(ownedOrder);
+
+        const result = await ordersService.findByIdForActor(ownedOrder.id, {
+          userId: adminId,
+          role: UserRole.ADMIN,
+        });
+
+        expect(result).toBe(ownedOrder);
+      });
+
+      it.each([UserRole.CUSTOMER, UserRole.ADMIN])(
+        'throws NotFoundException for a missing order (%s)',
+        async (role) => {
+          ordersRepositoryMock.findById.mockResolvedValue(null);
+
+          await expect(
+            ordersService.findByIdForActor('missing-order-id', {
+              userId: ownerId,
+              role,
+            }),
+          ).rejects.toThrow(NotFoundException);
+        },
+      );
+    });
+
+    describe('findByUserIdForActor', () => {
+      it('returns a customer`s own orders', async () => {
+        ordersRepositoryMock.findByUserId.mockResolvedValue([ownedOrder]);
+
+        const result = await ordersService.findByUserIdForActor(ownerId, {
+          userId: ownerId,
+          role: UserRole.CUSTOMER,
+        });
+
+        expect(result).toEqual([ownedOrder]);
+        expect(ordersRepositoryMock.findByUserId).toHaveBeenCalledWith(ownerId);
+      });
+
+      it('forbids a customer from listing another user`s orders without querying them', async () => {
+        await expect(
+          ordersService.findByUserIdForActor(ownerId, {
+            userId: otherCustomerId,
+            role: UserRole.CUSTOMER,
+          }),
+        ).rejects.toThrow(ForbiddenException);
+
+        expect(ordersRepositoryMock.findByUserId).not.toHaveBeenCalled();
+      });
+
+      it('returns any user`s orders to an admin', async () => {
+        ordersRepositoryMock.findByUserId.mockResolvedValue([ownedOrder]);
+
+        const result = await ordersService.findByUserIdForActor(ownerId, {
+          userId: adminId,
+          role: UserRole.ADMIN,
+        });
+
+        expect(result).toEqual([ownedOrder]);
+        expect(ordersRepositoryMock.findByUserId).toHaveBeenCalledWith(ownerId);
+      });
+    });
+  });
 });
