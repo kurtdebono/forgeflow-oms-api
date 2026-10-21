@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { CacheModule } from '@nestjs/cache-manager';
 import { Test, TestingModule } from '@nestjs/testing';
 import { config } from 'dotenv';
 import { OrderStatus, Prisma, UserRole } from '@prisma/client';
@@ -11,6 +12,12 @@ import { ProductRepository } from '../products/product.repository';
 
 import { InventoryService } from '../inventory/inventory.service';
 import { InventoryRepository } from '../inventory/inventory.repository';
+
+import { IdempotencyService } from '../idempotency/idempotency.service';
+import { IdempotencyRepository } from '../idempotency/idempotency.repository';
+
+import { OutboxService } from '../outbox/outbox.service';
+import { OutboxRepository } from '../outbox/outbox.repository';
 
 import { PrismaService } from '../../infrastructure/database/prisma/prisma.service';
 
@@ -26,6 +33,8 @@ describe('OrdersService Integration', () => {
     });
 
     moduleRef = await Test.createTestingModule({
+      // In-memory cache: ProductService needs CACHE_MANAGER, but these tests exercise the database, not Redis.
+      imports: [CacheModule.register()],
       providers: [
         OrdersService,
         OrdersRepository,
@@ -33,6 +42,10 @@ describe('OrdersService Integration', () => {
         ProductRepository,
         InventoryService,
         InventoryRepository,
+        IdempotencyService,
+        IdempotencyRepository,
+        OutboxService,
+        OutboxRepository,
         PrismaService,
       ],
     }).compile();
@@ -44,6 +57,8 @@ describe('OrdersService Integration', () => {
   });
 
   beforeEach(async () => {
+    await prisma.outboxEvent.deleteMany();
+    await prisma.idempotencyRecord.deleteMany();
     await prisma.orderItem.deleteMany();
     await prisma.order.deleteMany();
     await prisma.inventory.deleteMany();
