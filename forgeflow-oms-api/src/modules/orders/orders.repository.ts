@@ -23,19 +23,12 @@ export type OrderWithDetails = Prisma.OrderGetPayload<typeof orderWithDetails>;
 export class OrdersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  get() {
+  get(): Promise<OrderWithDetails[]> {
     return this.prisma.order.findMany({
-      include: {
-        user: true,
-        items: {
-          include: {
-            product: true,
-          },
-        },
-      },
       orderBy: {
         createdAt: 'desc',
       },
+      ...orderWithDetails,
     });
   }
 
@@ -59,7 +52,7 @@ export class OrdersRepository {
     });
   }
 
-  findByUserId(userId: string) {
+  findByUserId(userId: string): Promise<OrderWithDetails[]> {
     return this.prisma.order.findMany({
       where: { userId },
       orderBy: {
