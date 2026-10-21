@@ -15,10 +15,7 @@ import { OutboxService } from '../outbox/outbox.service';
 import { OutboxEventTypes } from '../outbox/outbox.constants';
 
 type OrdersRepositoryMock = jest.Mocked<
-  Pick<
-    OrdersRepository,
-    'create' | 'findByUserId' | 'findById' | 'tryUpdateStatus'
-  >
+  Pick<OrdersRepository, 'create' | 'findPage' | 'findById' | 'tryUpdateStatus'>
 >;
 
 type ProductServiceMock = jest.Mocked<Pick<ProductService, 'findById'>>;
@@ -69,7 +66,7 @@ describe('OrdersService', () => {
     ordersRepositoryMock = {
       create: jest.fn(),
       findById: jest.fn(),
-      findByUserId: jest.fn(),
+      findPage: jest.fn(),
       tryUpdateStatus: jest.fn(),
     };
 
@@ -894,39 +891,100 @@ describe('OrdersService', () => {
     });
 
     describe('findByUserIdForActor', () => {
-      it('returns a customer`s own orders', async () => {
-        ordersRepositoryMock.findByUserId.mockResolvedValue([ownedOrder]);
+      const pageRequest = { page: 2, limit: 10 };
 
-        const result = await ordersService.findByUserIdForActor(ownerId, {
-          userId: ownerId,
-          role: UserRole.CUSTOMER,
+      it('returns a page of a customer`s own orders', async () => {
+        ordersRepositoryMock.findPage.mockResolvedValue({
+          items: [ownedOrder],
+          total: 11,
         });
 
-        expect(result).toEqual([ownedOrder]);
-        expect(ordersRepositoryMock.findByUserId).toHaveBeenCalledWith(ownerId);
+        const result = await ordersService.findByUserIdForActor(
+          ownerId,
+          { userId: ownerId, role: UserRole.CUSTOMER },
+          pageRequest,
+        );
+
+        expect(result).toEqual({
+          data: [ownedOrder],
+          meta: { page: 2, limit: 10, total: 11, totalPages: 2 },
+        });
+        expect(ordersRepositoryMock.findPage).toHaveBeenCalledWith(
+          { userId: ownerId },
+          pageRequest,
+        );
       });
 
-      it('forbids a customer from listing another user`s orders without querying them', async () => {
+      it('forbids a customer from listing another user`s orders without listing or counting them (AC6)', async () => {
         await expect(
-          ordersService.findByUserIdForActor(ownerId, {
-            userId: otherCustomerId,
-            role: UserRole.CUSTOMER,
-          }),
+          ordersService.findByUserIdForActor(
+            ownerId,
+            { userId: otherCustomerId, role: UserRole.CUSTOMER },
+            { page: 1, limit: 10 },
+          ),
         ).rejects.toThrow(ForbiddenException);
 
-        expect(ordersRepositoryMock.findByUserId).not.toHaveBeenCalled();
+        expect(ordersRepositoryMock.findPage).not.toHaveBeenCalled();
       });
 
-      it('returns any user`s orders to an admin', async () => {
-        ordersRepositoryMock.findByUserId.mockResolvedValue([ownedOrder]);
-
-        const result = await ordersService.findByUserIdForActor(ownerId, {
-          userId: adminId,
-          role: UserRole.ADMIN,
+      it('returns a page of any user`s orders to an admin', async () => {
+        ordersRepositoryMock.findPage.mockResolvedValue({
+          items: [ownedOrder],
+          total: 1,
         });
 
-        expect(result).toEqual([ownedOrder]);
-        expect(ordersRepositoryMock.findByUserId).toHaveBeenCalledWith(ownerId);
+        const result = await ordersService.findByUserIdForActor(
+          ownerId,
+          { userId: adminId, role: UserRole.ADMIN },
+          pageRequest,
+        );
+
+        expect(result.data).toEqual([ownedOrder]);
+        expect(ordersRepositoryMock.findPage).toHaveBeenCalledWith(
+          { userId: ownerId },
+          pageRequest,
+        );
+      });
+    });
+
+    describe('list endpoints', () => {
+      it('get returns a page of all orders with meta', async () => {
+        ordersRepositoryMock.findPage.mockResolvedValue({
+          items: [ownedOrder],
+          total: 28,
+        });
+
+        const result = await ordersService.get({ page: 1, limit: 20 });
+
+        expect(result).toEqual({
+          data: [ownedOrder],
+          meta: { page: 1, limit: 20, total: 28, totalPages: 2 },
+        });
+        expect(ordersRepositoryMock.findPage).toHaveBeenCalledWith(
+          {},
+          { page: 1, limit: 20 },
+        );
+      });
+
+      it('findByUserId returns a page of that user`s orders, empty when they have none', async () => {
+        ordersRepositoryMock.findPage.mockResolvedValue({
+          items: [],
+          total: 0,
+        });
+
+        const result = await ordersService.findByUserId(ownerId, {
+          page: 3,
+          limit: 20,
+        });
+
+        expect(result).toEqual({
+          data: [],
+          meta: { page: 3, limit: 20, total: 0, totalPages: 0 },
+        });
+        expect(ordersRepositoryMock.findPage).toHaveBeenCalledWith(
+          { userId: ownerId },
+          { page: 3, limit: 20 },
+        );
       });
     });
   });
