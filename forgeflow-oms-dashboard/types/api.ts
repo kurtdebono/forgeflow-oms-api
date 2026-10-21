@@ -29,6 +29,23 @@ export type Order = {
     }[];
 };
 
+export type PageMeta = {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+};
+
+export type Paginated<T> = {
+    data: T[];
+    meta: PageMeta;
+};
+
+export type PageQuery = {
+    page?: number;
+    limit?: number;
+};
+
 export type OrderAnalysis = {
     id: string;
     orderId: string;
