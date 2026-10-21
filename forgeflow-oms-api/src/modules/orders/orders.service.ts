@@ -19,6 +19,11 @@ import { IdempotencyOperations } from '../idempotency/idempotency.constants';
 import { OutboxService } from '../outbox/outbox.service';
 import { OutboxEventTypes } from '../outbox/outbox.constants';
 
+type OrderActor = {
+  userId: string;
+  role: UserRole;
+};
+
 @Injectable()
 export class OrdersService {
   constructor(
@@ -299,7 +304,36 @@ export class OrdersService {
     return order;
   }
 
+  async findByIdForActor(
+    id: string,
+    actor: OrderActor,
+  ): Promise<OrderWithDetails> {
+    const order = await this.findById(id);
+
+    if (!this.canReadOrdersOf(order.userId, actor)) {
+      throw new ForbiddenException('You cannot view this order.');
+    }
+
+    return order;
+  }
+
   findByUserId(userId: string) {
     return this.ordersRepository.findByUserId(userId);
+  }
+
+  async findByUserIdForActor(
+    userId: string,
+    actor: OrderActor,
+  ): Promise<OrderWithDetails[]> {
+    // Checked before loading so a customer learns nothing about another user's orders.
+    if (!this.canReadOrdersOf(userId, actor)) {
+      throw new ForbiddenException('You cannot view orders of another user.');
+    }
+
+    return this.ordersRepository.findByUserId(userId);
+  }
+
+  private canReadOrdersOf(ownerUserId: string, actor: OrderActor): boolean {
+    return actor.role === UserRole.ADMIN || actor.userId === ownerUserId;
   }
 }

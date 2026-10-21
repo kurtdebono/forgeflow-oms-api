@@ -64,12 +64,23 @@ export class OrdersController {
   }
 
   @Get(':id')
-  findById(@Param('id') id: string) {
-    return this.ordersService.findById(id);
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  findById(@Param('id') id: string, @CurrentUser() user: AuthenticatedUser) {
+    return this.ordersService.findByIdForActor(id, {
+      userId: user.userId,
+      role: user.role,
+    });
   }
 
   @Get('user/:userId')
-  findByUserId(@Param('userId') userId: string) {
-    return this.ordersService.findByUserId(userId);
+  @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
+  findByUserId(
+    @Param('userId') userId: string,
+    @CurrentUser() user: AuthenticatedUser,
+  ) {
+    return this.ordersService.findByUserIdForActor(userId, {
+      userId: user.userId,
+      role: user.role,
+    });
   }
 }
