@@ -88,6 +88,9 @@ model Order {
   createdAt           DateTime    @default(now())
   updatedAt           DateTime    @updatedAt
   analysis            OrderAnalysis[]
+
+  @@index([createdAt, id])
+  @@index([userId, createdAt, id])
 }
 
 model OrderItem {

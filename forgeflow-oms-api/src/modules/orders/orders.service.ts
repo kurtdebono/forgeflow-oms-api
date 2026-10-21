@@ -18,6 +18,7 @@ import { IdempotencyService } from '../idempotency/idempotency.service';
 import { IdempotencyOperations } from '../idempotency/idempotency.constants';
 import { OutboxService } from '../outbox/outbox.service';
 import { OutboxEventTypes } from '../outbox/outbox.constants';
+import { PageRequest, Paginated, toPage } from './pagination';
 
 type OrderActor = {
   userId: string;
@@ -95,8 +96,12 @@ export class OrdersService {
     return this.ordersRepository.create(orderCreateInput, tx);
   }
 
-  async get(): Promise<OrderWithDetails[]> {
-    return this.ordersRepository.get();
+  async get(pageRequest: PageRequest): Promise<Paginated<OrderWithDetails>> {
+    const { items, total } = await this.ordersRepository.findPage(
+      {},
+      pageRequest,
+    );
+    return toPage(items, total, pageRequest);
   }
 
   async create(userId: string, data: CreateOrderDto, idempotencyKey: string) {
@@ -317,20 +322,28 @@ export class OrdersService {
     return order;
   }
 
-  findByUserId(userId: string) {
-    return this.ordersRepository.findByUserId(userId);
+  async findByUserId(
+    userId: string,
+    pageRequest: PageRequest,
+  ): Promise<Paginated<OrderWithDetails>> {
+    const { items, total } = await this.ordersRepository.findPage(
+      { userId },
+      pageRequest,
+    );
+    return toPage(items, total, pageRequest);
   }
 
   async findByUserIdForActor(
     userId: string,
     actor: OrderActor,
-  ): Promise<OrderWithDetails[]> {
+    pageRequest: PageRequest,
+  ): Promise<Paginated<OrderWithDetails>> {
     // Checked before loading so a customer learns nothing about another user's orders.
     if (!this.canReadOrdersOf(userId, actor)) {
       throw new ForbiddenException('You cannot view orders of another user.');
     }
 
-    return this.ordersRepository.findByUserId(userId);
+    return this.findByUserId(userId, pageRequest);
   }
 
   private canReadOrdersOf(ownerUserId: string, actor: OrderActor): boolean {

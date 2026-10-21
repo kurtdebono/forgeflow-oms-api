@@ -18,6 +18,7 @@ import { PrismaService } from '../../infrastructure/database/prisma/prisma.servi
 import { OutboxEventTypes } from '../outbox/outbox.constants';
 import { LoginResponse } from '../auth/dto/login-response.dto';
 import { OrderWithDetails } from './orders.repository';
+import { Paginated } from './pagination';
 
 describe('Auth / Products / Orders e2e', () => {
   let app: INestApplication;
@@ -514,7 +515,7 @@ describe('Auth / Products / Orders e2e', () => {
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .expect(200);
 
-      const orders = response.body as OrderWithDetails[];
+      const orders = (response.body as Paginated<OrderWithDetails>).data;
 
       expect(orders).toHaveLength(1);
       for (const order of orders) {
@@ -594,9 +595,11 @@ describe('Auth / Products / Orders e2e', () => {
         .set('Authorization', `Bearer ${owner.accessToken}`)
         .expect(200);
 
-      const orders = response.body as OrderWithDetails[];
+      const { data: orders, meta } =
+        response.body as Paginated<OrderWithDetails>;
 
       expect(orders.map((order) => order.id)).toEqual([ownOrder.id]);
+      expect(meta.total).toBe(1);
       expectNoCredentialFields(response);
     });
 
@@ -624,7 +627,7 @@ describe('Auth / Products / Orders e2e', () => {
         .set('Authorization', `Bearer ${admin.accessToken}`)
         .expect(200);
 
-      const orders = response.body as OrderWithDetails[];
+      const orders = (response.body as Paginated<OrderWithDetails>).data;
 
       expect(orders.map((o) => o.id)).toEqual([order.id]);
       expectNoCredentialFields(response);

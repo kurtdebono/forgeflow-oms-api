@@ -6,9 +6,11 @@ import {
   Get,
   Param,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { PaginationQueryDto } from './dto/pagination-query.dto';
 import { OrdersService } from './orders.service';
 import { JwtAuthGuard } from '../auth/strategies/jwt-auth.guard';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -25,8 +27,8 @@ export class OrdersController {
 
   @Get()
   @Roles(UserRole.ADMIN)
-  get() {
-    return this.ordersService.get();
+  get(@Query() query: PaginationQueryDto) {
+    return this.ordersService.get(query);
   }
 
   @Post()
@@ -44,8 +46,11 @@ export class OrdersController {
 
   @Get('my')
   @Roles(UserRole.CUSTOMER, UserRole.ADMIN)
-  findMyOrders(@CurrentUser() user: AuthenticatedUser) {
-    return this.ordersService.findByUserId(user.userId);
+  findMyOrders(
+    @CurrentUser() user: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
+  ) {
+    return this.ordersService.findByUserId(user.userId, query);
   }
 
   @Post(':id/confirm')
@@ -77,10 +82,12 @@ export class OrdersController {
   findByUserId(
     @Param('userId') userId: string,
     @CurrentUser() user: AuthenticatedUser,
+    @Query() query: PaginationQueryDto,
   ) {
-    return this.ordersService.findByUserIdForActor(userId, {
-      userId: user.userId,
-      role: user.role,
-    });
+    return this.ordersService.findByUserIdForActor(
+      userId,
+      { userId: user.userId, role: user.role },
+      query,
+    );
   }
 }
