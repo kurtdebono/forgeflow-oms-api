@@ -420,6 +420,7 @@ pnpm build
 ```bash
 cd forgeflow-oms-dashboard
 pnpm lint
+pnpm test
 pnpm build
 ```
 
@@ -444,6 +445,7 @@ Dashboard CI checks:
 ```text
 install dependencies
 lint
+tests
 build
 ```
 

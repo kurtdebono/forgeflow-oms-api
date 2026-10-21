@@ -81,6 +81,12 @@ jobs:
       - name: Test
         run: pnpm test
 
+      - name: E2E tests
+        run: pnpm test:e2e
+
+      - name: Integration tests
+        run: pnpm test:int
+
       - name: Build
         run: pnpm build
 
@@ -114,6 +120,9 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Test
+        run: pnpm test
 
       - name: Build
         run: pnpm build

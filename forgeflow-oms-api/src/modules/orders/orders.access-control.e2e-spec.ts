@@ -118,7 +118,10 @@ describe('Orders access control (QA) e2e', () => {
       .get('/orders/my')
       .set('Authorization', `Bearer ${b.token}`)
       .expect(200);
-    expect(res.body).toEqual([]);
+    expect(res.body).toEqual({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
   });
 
   it('forbids customers from the intelligence endpoints on any order', async () => {
@@ -213,10 +216,14 @@ describe('Orders access control (QA) e2e', () => {
       .get('/orders/user/not-a-uuid')
       .set('Authorization', `Bearer ${admin.token}`)
       .expect(200);
-    expect(res.body).toEqual([]);
+    expect(res.body).toEqual({
+      data: [],
+      meta: { page: 1, limit: 20, total: 0, totalPages: 0 },
+    });
   });
 
-  it('does not let query parameters widen /orders/user/:userId or /orders/my', async () => {
+  // Unknown query params are rejected outright (400) since pagination added a strict query DTO.
+  it('does not let query parameters widen /orders/user/:userId or /orders/my (rejected with 400)', async () => {
     const owner = await login(UserRole.CUSTOMER);
     const other = await login(UserRole.CUSTOMER);
     await seedOrder(other.id);
@@ -227,8 +234,8 @@ describe('Orders access control (QA) e2e', () => {
       const res = await request(httpServer)
         .get(path)
         .set('Authorization', `Bearer ${owner.token}`)
-        .expect(200);
-      expect(res.body).toEqual([]);
+        .expect(400);
+      expect(res.text).not.toContain('Lamp');
     }
   });
 

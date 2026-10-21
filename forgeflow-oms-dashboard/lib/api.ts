@@ -1,5 +1,5 @@
 import { getAccessToken } from "./auth";
-import type { LoginResponse, Order, OrderAnalysis } from "@/types/api";
+import type { LoginResponse, Order, OrderAnalysis, PageQuery, Paginated } from "@/types/api";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -14,7 +14,6 @@ type ApiOptions = {
 }
 
 async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
-    debugger
     const headers: Record<string, string> = {
         'Content-Type': 'application/json'
     };
@@ -55,12 +54,28 @@ export function login(email: string, password: string) {
     });
 }
 
-export function getOrders() {
-    return apiFetch<Order[]>('/orders');
+function withPageQuery(path: string, query: PageQuery): string {
+    const params = new URLSearchParams();
+
+    if(query.page !== undefined) {
+        params.set('page', String(query.page));
+    }
+
+    if(query.limit !== undefined) {
+        params.set('limit', String(query.limit));
+    }
+
+    const search = params.toString();
+
+    return search ? `${path}?${search}` : path;
 }
 
-export function getMyOrders() {
-    return apiFetch<Order[]>('/orders/my');
+export function getOrders(query: PageQuery = {}): Promise<Paginated<Order>> {
+    return apiFetch<Paginated<Order>>(withPageQuery('/orders', query));
+}
+
+export function getMyOrders(query: PageQuery = {}): Promise<Paginated<Order>> {
+    return apiFetch<Paginated<Order>>(withPageQuery('/orders/my', query));
 }
 
 export function getOrder(orderId: string) {
